@@ -13,8 +13,9 @@ async def handler(websocket, path):
     """
     try:
         if "Upgrade" not in websocket.request_headers or websocket.request_headers["Upgrade"].lower() != "websocket":
-            print("⚠️ Richiesta HTTP ignorata")
-            return  # 🔴 Ignoriamo la richiesta HTTP senza generare errori nei log
+            print("⚠️ Richiesta HTTP ricevuta e ignorata")
+            await websocket.close(code=1000)  # 🔴 Chiudiamo la connessione in modo pulito
+            return
 
         print("✅ Nuova connessione WebSocket su /ws")
         async for message in websocket:
@@ -39,7 +40,7 @@ async def start_websocket():
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
     """
-    Server HTTP per l'Health Check di Render.
+    Server HTTP per l'Health Check di Render, gestisce anche richieste HEAD.
     """
     def do_GET(self):
         if self.path == "/":
@@ -50,6 +51,14 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         else:
             self.send_response(404)
             self.end_headers()
+
+    def do_HEAD(self):
+        """
+        Intercetta richieste HEAD e risponde con 200 OK.
+        """
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
 
 def start_http_server():
     """
@@ -68,3 +77,4 @@ if __name__ == "__main__":
         asyncio.run(start_websocket())
     except Exception as e:
         print(f"❌ Errore nell'avvio del server: {e}")
+
