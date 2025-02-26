@@ -4,7 +4,7 @@ import websockets
 import os
 import datetime
 from game_logic import load_game_data
-from aiohttp import web  # Server HTTP per health check
+from aiohttp import web  # Per gestire richieste HTTP separatamente
 
 PORT = int(os.getenv("PORT", 8002))  # Porta WebSocket
 HTTP_PORT = int(os.getenv("HTTP_PORT", 8080))  # Porta HTTP per Render
