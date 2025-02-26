@@ -1,27 +1,27 @@
 import asyncio
+import json
 import websockets
 import os
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import json
 import datetime
 from game_logic import load_game_data
 
 connected_clients = set()
 ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 
+# 🔴 Usa la porta assegnata da Render (al posto di 8002)
+WS_PORT = int(os.getenv("PORT", 8080))
+
 async def notify_clients():
     """
     Invia aggiornamenti ai client WebSocket solo se ci sono nuove informazioni.
     """
     global ultimo_stato_trasmesso  
-    
     while True:
         if connected_clients:
             try:
                 game_data = load_game_data()
                 
-                # 📊 Crea lo stato attuale del gioco con tutti i dati
+                # 📊 Stato attuale del gioco con tutti i dati
                 stato_attuale = {
                     "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
                     "numeri_estratti": game_data["drawn_numbers"],  # ✅ Lista completa dei numeri estratti
@@ -65,10 +65,9 @@ async def notify_clients():
                 
         await asyncio.sleep(2)  # Mantiene aggiornamenti costanti
 
-
 async def handler(websocket, path):
     """
-    Gestisce le connessioni WebSocket con la WebApp.
+    Gestisce solo connessioni WebSocket con la WebApp.
     """
     connected_clients.add(websocket)
     
@@ -106,67 +105,24 @@ async def handler(websocket, path):
         connected_clients.remove(websocket)
         print(f"🔴 Client disconnesso! Totale client attivi: {len(connected_clients)}")
 
-
-# 🔴 Usa la porta assegnata da Render
-WS_PORT = int(os.getenv("PORT", 8080))  # Render fornisce automaticamente la porta
-HTTP_PORT = 10001  # 🔴 Porta fissa per l'health check (deve essere diversa da WS_PORT)
-
-async def handler(websocket, path):
+async def start_server():
     """
-    Gestisce solo connessioni WebSocket e ignora richieste HTTP.
-    """
-    print("✅ Nuova connessione WebSocket accettata!")
-    try:
-        async for message in websocket:
-            print(f"📩 Messaggio ricevuto: {message}")
-            await websocket.send(f"Echo: {message}")
-    except Exception as e:
-        print(f"⚠️ Errore WebSocket: {e}")
-
-async def start_websocket():
-    """
-    Avvia il server WebSocket sulla porta fornita da Render.
+    Avvia il server WebSocket su Render, usando la porta dinamica assegnata.
     """
     server = await websockets.serve(
         handler,
         "0.0.0.0",
-        WS_PORT
+        WS_PORT,
+        ping_interval=5,  # Mantiene le connessioni attive ogni 5 secondi
+        ping_timeout=None
     )
-    print(f"✅ WebSocket Server avviato su ws://0.0.0.0:{WS_PORT}/")
-
-    await server.wait_closed()
-
-class HealthCheckHandler(BaseHTTPRequestHandler):
-    """
-    Server HTTP per l'Health Check di Render.
-    """
-    def do_GET(self):
-        if self.path == "/":
-            self.send_response(200)
-            self.send_header("Content-type", "text/plain")
-            self.end_headers()
-            self.wfile.write(b"WebSocket Server Running")
-        else:
-            self.send_response(404)
-            self.end_headers()
-
-def start_http_server():
-    """
-    Avvia un piccolo server HTTP per l'Health Check di Render.
-    """
-    try:
-        server = HTTPServer(("0.0.0.0", HTTP_PORT), HealthCheckHandler)
-        print(f"🌍 Server HTTP avviato su http://0.0.0.0:{HTTP_PORT}/")
-        server.serve_forever()
-    except Exception as e:
-        print(f"❌ Errore nell'avvio del server HTTP: {e}")
+    print(f"✅ WebSocket Server avviato su wss://websocket-server-5muq.onrender.com/ws")
+    
+    # Avvia `notify_clients()` in parallelo
+    await asyncio.gather(server.wait_closed(), notify_clients())
 
 if __name__ == "__main__":
     try:
-        # Avvia il server HTTP per l'health check in un thread separato
-        threading.Thread(target=start_http_server, daemon=True).start()
-        
-        # Avvia il WebSocket Server sulla porta fornita da Render
-        asyncio.run(start_websocket())
+        asyncio.run(start_server())
     except Exception as e:
         print(f"❌ Errore nell'avvio del WebSocket Server: {e}")
