@@ -38,7 +38,6 @@ async def health_check(request):
 async def start_http_server():
     app = web.Application()
     app.router.add_get("/", health_check)  # GET per il controllo Render
-    app.router.add_head("/", health_check)  # HEAD per Render
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", HTTP_PORT)
