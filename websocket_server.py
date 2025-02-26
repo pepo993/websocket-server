@@ -6,8 +6,9 @@ import datetime
 from game_logic import load_game_data
 from aiohttp import web  # Per gestire richieste HTTP separatamente
 
-PORT = int(os.getenv("PORT", 8002))  # Porta WebSocket
-HTTP_PORT = 8080  # Porta HTTP per Render health check
+# 📌 Render assegna automaticamente una porta tramite la variabile d'ambiente PORT
+PORT = int(os.getenv("PORT", 8000))  # La porta WebSocket DEVE essere quella assegnata da Render
+HTTP_PORT = 8080  # Porta per il server HTTP di health check
 connected_clients = set()
 ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 
@@ -89,11 +90,11 @@ async def websocket_handler(websocket, path):
 
 
 async def start_websocket_server():
-    """Avvia il server WebSocket."""
+    """Avvia il server WebSocket sulla porta fornita da Render."""
     server = await websockets.serve(
         websocket_handler,
         "0.0.0.0",
-        PORT,
+        PORT,  # 📌 Deve essere la porta assegnata da Render
         ping_interval=10,
         ping_timeout=20
     )
@@ -109,8 +110,7 @@ async def health_check(request):
 async def start_http_server():
     """Avvia un server HTTP per il health check richiesto da Render."""
     app = web.Application()
-    app.router.add_get("/", health_check)  # Render usa GET
-    app.router.add_head("/", health_check)  # Render usa HEAD per controllare lo stato
+    app.router.add_get("/", health_check)  # 🚀 NON aggiungere esplicitamente HEAD!
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", HTTP_PORT)
