@@ -4,7 +4,7 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-PORT = int(os.getenv("PORT", 8080))  # 🔴 Porta WebSocket assegnata da Render
+WS_PORT = 8765  # 🔴 Nuova porta per il WebSocket
 HTTP_PORT = 10001  # 🔴 Porta del server HTTP per l'Health Check di Render
 
 async def handler(websocket, path):
@@ -27,20 +27,20 @@ async def handler(websocket, path):
 
 async def start_websocket():
     """
-    Avvia il server WebSocket su Render e accetta connessioni su /ws.
+    Avvia il server WebSocket su una porta separata.
     """
     server = await websockets.serve(
         handler,
         "0.0.0.0",
-        PORT
+        WS_PORT
     )
-    print(f"✅ WebSocket Server avviato su ws://0.0.0.0:{PORT}/ws")
+    print(f"✅ WebSocket Server avviato su ws://0.0.0.0:{WS_PORT}/ws")
 
     await server.wait_closed()
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
     """
-    Server HTTP per l'Health Check di Render, gestisce anche richieste HEAD.
+    Server HTTP per l'Health Check di Render.
     """
     def do_GET(self):
         if self.path == "/":
@@ -62,7 +62,7 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 
 def start_http_server():
     """
-    Avvia un piccolo server HTTP per far contento Render.
+    Avvia un piccolo server HTTP per l'Health Check di Render.
     """
     server = HTTPServer(("0.0.0.0", HTTP_PORT), HealthCheckHandler)
     print(f"🌍 Server HTTP avviato su http://0.0.0.0:{HTTP_PORT}/")
@@ -73,7 +73,7 @@ if __name__ == "__main__":
         # Avvia il server HTTP in un thread separato
         threading.Thread(target=start_http_server, daemon=True).start()
         
-        # Avvia il WebSocket Server
+        # Avvia il WebSocket Server in una porta separata
         asyncio.run(start_websocket())
     except Exception as e:
         print(f"❌ Errore nell'avvio del server: {e}")
