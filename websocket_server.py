@@ -5,12 +5,16 @@ import os
 PORT = int(os.getenv("PORT", 8080))  # Porta assegnata da Render
 
 async def handler(websocket, path):
-    """Gestisce connessioni WebSocket e risponde con un semplice echo."""
-    print("✅ Nuova connessione WebSocket!")
+    """Gestisce connessioni WebSocket e ignora le richieste HTTP."""
+    if "Upgrade" not in websocket.request_headers or websocket.request_headers["Upgrade"].lower() != "websocket":
+        print("⚠️ Richiesta HTTP ricevuta (non WebSocket), chiudo connessione.")
+        return  # Non solleviamo errori, semplicemente ignoriamo la richiesta
+
+    print("✅ Nuova connessione WebSocket accettata!")
     try:
         async for message in websocket:
             print(f"📩 Messaggio ricevuto: {message}")
-            await websocket.send(f"Echo: {message}")  # Risponde con il messaggio ricevuto
+            await websocket.send(f"Echo: {message}")  # Risponde con lo stesso messaggio
     except websockets.exceptions.ConnectionClosed:
         print("🔴 Connessione chiusa")
     except Exception as e:
