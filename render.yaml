@@ -9,4 +9,3 @@ services:
     envVars:
       - key: PORT
         value: 8002
-    healthCheckPath: ""  # 🔴 Disabilita il controllo HTTP
