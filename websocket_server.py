@@ -55,7 +55,7 @@ def start_http_server():
     """
     Avvia un piccolo server HTTP su una porta diversa per l'health check di Render.
     """
-    http_port = 10000  # 🔴 Scegliamo una porta diversa da quella del WebSocket
+    http_port = 10001  # 🔴 Scegliamo una porta diversa da quella del WebSocket
     server = HTTPServer(("0.0.0.0", http_port), HealthCheckHandler)
     print(f"🌍 Server HTTP avviato su http://0.0.0.0:{http_port}/")
     server.serve_forever()
