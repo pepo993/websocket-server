@@ -14,39 +14,40 @@ def log_message(message):
     print(f"[{datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] {message}")
 
 async def handler(websocket, path):
-    """Gestisce connessioni WebSocket e rifiuta richieste HTTP non valide."""
+    """Gestisce connessioni WebSocket e ignora richieste HTTP."""
     try:
-        # Controlla se la richiesta è effettivamente WebSocket
         if "Upgrade" not in websocket.request_headers or websocket.request_headers["Upgrade"].lower() != "websocket":
-            log_message("⚠️ Connessione HTTP non valida rifiutata.")
-            await websocket.close(code=4001, reason="Non è una connessione WebSocket")
-            return
+            log_message("⚠️ Richiesta HTTP ricevuta e ignorata")
+            return  # Ignora senza errori
 
-        log_message(f"✅ Connessione WebSocket accettata da {websocket.remote_address}")
+        log_message(f"✅ Nuova connessione WebSocket accettata da {websocket.remote_address}")
 
-        async for message in websocket:
-            log_message(f"📩 Messaggio ricevuto: {message}")
-            response = f"Echo: {message}"
-            await websocket.send(response)
-            log_message(f"📤 Risposta inviata: {response}")
+        while True:
+            try:
+                message = await websocket.recv()
+                log_message(f"📩 Messaggio ricevuto: {message}")
 
-    except websockets.exceptions.ConnectionClosed as e:
-        log_message(f"🔴 Connessione chiusa: codice {e.code}, motivo: {e.reason}")
+                response = f"Echo: {message}"
+                await websocket.send(response)
+                log_message(f"📤 Risposta inviata: {response}")
+
+            except websockets.exceptions.ConnectionClosed as e:
+                log_message(f"🔴 Connessione chiusa: codice {e.code}, motivo: {e.reason}")
+                break  # Esce dal ciclo e chiude la connessione
+
+            except Exception as e:
+                log_message(f"⚠️ Errore durante la comunicazione WebSocket: {e}")
+                await websocket.close(code=1011, reason=str(e))
+                break  # Chiude la connessione dopo un errore
 
     except Exception as e:
-        log_message(f"⚠️ Errore WebSocket: {e}")
+        log_message(f"⚠️ Errore WebSocket durante la gestione della connessione: {e}")
         await websocket.close(code=1011, reason=str(e))
 
 async def start_websocket():
-    """Avvia il WebSocket Server con gestione degli errori."""
+    """Avvia il WebSocket Server."""
     try:
-        server = await websockets.serve(
-            handler,
-            "0.0.0.0",
-            PORT,
-            ping_interval=None,  # Disabilita il timeout del ping
-            ping_timeout=None
-        )
+        server = await websockets.serve(handler, "0.0.0.0", PORT)
         log_message(f"✅ WebSocket Server avviato su ws://0.0.0.0:{PORT}/")
         await server.wait_closed()
     except Exception as e:
@@ -66,12 +67,6 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
-    def do_HEAD(self):
-        """Gestisce richieste HEAD per evitare errori su Render"""
-        self.send_response(200)
-        self.send_header("Content-type", "text/plain")
-        self.end_headers()
-
 def start_http_server():
     """Avvia un piccolo server HTTP per l'health check di Render."""
     server = HTTPServer(("0.0.0.0", HTTP_PORT), HealthCheckHandler)
@@ -80,7 +75,10 @@ def start_http_server():
 
 if __name__ == "__main__":
     try:
-        threading.Thread(target=start_http_server, daemon=True).start()  # Avvia il server HTTP
-        asyncio.run(start_websocket())  # Avvia il WebSocket Server
+        # Avvia il server HTTP in un thread separato
+        threading.Thread(target=start_http_server, daemon=True).start()
+        
+        # Avvia il WebSocket Server
+        asyncio.run(start_websocket())
     except Exception as e:
         log_message(f"❌ Errore nell'avvio del WebSocket Server: {e}")
