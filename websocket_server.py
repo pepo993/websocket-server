@@ -18,7 +18,7 @@ async def handler(websocket, path):
     try:
         # Verifica se la connessione è WebSocket
         if "Upgrade" not in websocket.request_headers or websocket.request_headers["Upgrade"].lower() != "websocket":
-            log_message("⚠️ Richiesta HTTP rifiutata (non WebSocket). Chiudo connessione.")
+            log_message("⚠️ Richiesta HTTP rifiutata (non WebSocket).")
             await websocket.close(code=4001, reason="Non è una connessione WebSocket")
             return
 
@@ -32,9 +32,6 @@ async def handler(websocket, path):
 
     except websockets.exceptions.ConnectionClosed as e:
         log_message(f"🔴 Connessione chiusa: codice {e.code}, motivo: {e.reason}")
-
-    except EOFError:
-        log_message("⚠️ Il client ha chiuso la connessione prima di completare l'handshake.")
 
     except Exception as e:
         log_message(f"⚠️ Errore WebSocket: {e}")
@@ -77,10 +74,7 @@ def start_http_server():
 
 if __name__ == "__main__":
     try:
-        # Avvia il server HTTP in un thread separato
-        threading.Thread(target=start_http_server, daemon=True).start()
-        
-        # Avvia il WebSocket Server
-        asyncio.run(start_websocket())
+        threading.Thread(target=start_http_server, daemon=True).start()  # Avvia il server HTTP
+        asyncio.run(start_websocket())  # Avvia il WebSocket Server
     except Exception as e:
         log_message(f"❌ Errore nell'avvio del WebSocket Server: {e}")
