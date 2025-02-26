@@ -59,7 +59,7 @@ async def notify_clients():
                     
             except Exception as e:
                 print(f"❌ Errore generale in notify_clients: {e}")
-
+                
         await asyncio.sleep(2)  # Mantiene aggiornamenti costanti
 
 
@@ -110,12 +110,12 @@ async def start_server():
     """
     server = await websockets.serve(
         handler,
-        "127.0.0.1",
+        "0.0.0.0",
         8002,
-        ping_interval=10,  # Mantiene le connessioni attive ogni 30 secondi
+        ping_interval=5,  # Mantiene le connessioni attive ogni 5 secondi
         ping_timeout=None
     )
-    print("✅ WebSocket Server avviato su ws://127.0.0.1:8002/ws")
+    print("✅ WebSocket Server avviato su ws://0.0.0.0:8002/ws")
     
     # Avvia `notify_clients()` in parallelo
     await asyncio.gather(server.wait_closed(), notify_clients())
@@ -126,3 +126,4 @@ if __name__ == "__main__":
         asyncio.run(start_server())
     except Exception as e:
         print(f"❌ Errore nell'avvio del WebSocket Server: {e}")
+
