@@ -101,25 +101,10 @@ async def start_websocket_server():
     await server.wait_closed()
 
 
-async def health_check(request):
-    """Gestisce richieste di health check per Render."""
-    return web.Response(text="OK", status=200)
-
-
-async def start_http_server():
-    """Avvia un server HTTP per il health check richiesto da Render."""
-    app = web.Application()
-    app.router.add_get("/", health_check)  # Solo GET per evitare problemi con HEAD
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", HTTP_PORT)
-    await site.start()
-    print(f"✅ HTTP Server avviato su http://0.0.0.0:{HTTP_PORT}")
-
 
 async def main():
     """Avvia WebSocket e HTTP server in parallelo."""
-    await asyncio.gather(start_websocket_server(), start_http_server(), notify_clients())
+    await asyncio.gather(start_websocket_server(), notify_clients())
 
 
 if __name__ == "__main__":
