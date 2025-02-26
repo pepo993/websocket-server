@@ -3,8 +3,11 @@ import json
 import websockets
 import datetime
 from game_logic import load_game_data
+import os
 
-connected_clients = set()
+PORT = int(os.getenv("PORT", 8002))  # 🔴 Usa la porta di Render o fallback su 8002
+connected_clients = set()  # 🔵 Mantiene traccia dei client connessi
+
 ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 
 async def notify_clients():
@@ -106,20 +109,16 @@ async def handler(websocket, path):
 
 async def start_server():
     """
-    Avvia il server WebSocket con gestione avanzata delle connessioni.
+    Avvia il server WebSocket e accetta connessioni solo su `/ws`.
     """
     server = await websockets.serve(
         handler,
-        "0.0.0.0", # 🔴 CAMBIATO: ora accetta connessioni esterne
-        8002,
-        ping_interval=10,  # Mantiene le connessioni attive ogni 30 secondi
-        ping_timeout=None
+        "0.0.0.0",
+        PORT
     )
-    print("✅ WebSocket Server avviato su ws://0.0.0.0:8002/ws")
-    
-    # Avvia `notify_clients()` in parallelo
-    await asyncio.gather(server.wait_closed(), notify_clients())
+    print(f"✅ WebSocket Server avviato su ws://0.0.0.0:{PORT}/ws")
 
+    await server.wait_closed()
 
 if __name__ == "__main__":
     try:
