@@ -4,11 +4,12 @@ import websockets
 import os
 import datetime
 from game_logic import load_game_data
-from aiohttp import web  # Per gestire richieste HTTP
+from aiohttp import web  # Server HTTP per health check
 
-PORT = int(os.getenv("PORT", 8002))  # Porta per il WebSocket
+PORT = int(os.getenv("PORT", 8002))  # Porta WebSocket
+HTTP_PORT = int(os.getenv("HTTP_PORT", 8080))  # Porta HTTP per Render
 connected_clients = set()
-ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
+ultimo_stato_trasmesso = None  # Stato ultimo trasmesso ai client
 
 
 async def notify_clients():
@@ -58,8 +59,8 @@ async def notify_clients():
         await asyncio.sleep(2)
 
 
-async def handler(websocket, path):
-    """Gestisce connessioni WebSocket e aggiorna i client."""
+async def websocket_handler(websocket, path):
+    """Gestisce le connessioni WebSocket."""
     if path != "/ws":
         await websocket.close()
         return
@@ -78,6 +79,8 @@ async def handler(websocket, path):
     try:
         async for _ in websocket:
             pass  # Mantiene la connessione attiva
+    except websockets.exceptions.ConnectionClosed:
+        print(f"🔴 Client {client_ip} disconnesso")
     except Exception as e:
         print(f"⚠️ Errore WebSocket: {e}")
     finally:
@@ -88,7 +91,7 @@ async def handler(websocket, path):
 async def start_websocket_server():
     """Avvia il server WebSocket."""
     server = await websockets.serve(
-        handler,
+        websocket_handler,
         "0.0.0.0",
         PORT,
         ping_interval=10,
@@ -99,24 +102,23 @@ async def start_websocket_server():
 
 
 async def health_check(request):
-    """Gestisce richieste HTTP HEAD/GET per il controllo di salute di Render."""
+    """Gestisce richieste di health check per Render."""
     return web.Response(text="OK", status=200)
 
 
 async def start_http_server():
-    """Avvia un server HTTP su una porta diversa per gestire richieste di health check."""
+    """Avvia un server HTTP per il health check richiesto da Render."""
     app = web.Application()
-    app.router.add_get("/", health_check)  # Render può usare GET per verificare lo stato
-    app.router.add_head("/", health_check)  # Per richieste HEAD di Render
+    app.router.add_get("/", health_check)  # Solo GET per evitare problemi con HEAD
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 8080)  # Porta HTTP separata
+    site = web.TCPSite(runner, "0.0.0.0", HTTP_PORT)
     await site.start()
-    print("✅ HTTP Server avviato su http://0.0.0.0:8080")
+    print(f"✅ HTTP Server avviato su http://0.0.0.0:{HTTP_PORT}")
 
 
 async def main():
-    """Avvia sia il server WebSocket che il server HTTP per il health check."""
+    """Avvia WebSocket e HTTP server in parallelo."""
     await asyncio.gather(start_websocket_server(), start_http_server(), notify_clients())
 
 
