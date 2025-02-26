@@ -4,7 +4,8 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-PORT = int(os.getenv("PORT", 10000))  # Porta automatica di Render
+# Ottieni la porta assegnata da Render
+PORT = int(os.getenv("PORT", 8080))  # Se "PORT" non esiste, usa 8080 come default
 
 async def handler(websocket, path):
     """Gestisce connessioni WebSocket."""
@@ -17,13 +18,13 @@ async def handler(websocket, path):
         print(f"⚠️ Errore WebSocket: {e}")
 
 async def start_websocket():
-    """Avvia il WebSocket Server su ws:// e non wss://"""
+    """Avvia il WebSocket Server sulla porta assegnata da Render"""
     server = await websockets.serve(handler, "0.0.0.0", PORT)
     print(f"✅ WebSocket Server avviato su ws://0.0.0.0:{PORT}/ws")
     await server.wait_closed()
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
-    """Server HTTP per Render (per l'health check)."""
+    """Server HTTP per Render per evitare errori 502."""
     def do_GET(self):
         if self.path == "/":
             self.send_response(200)
@@ -35,10 +36,14 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
 def start_http_server():
-    """Avvia un piccolo server HTTP per evitare errori 502 su Render."""
-    server = HTTPServer(("0.0.0.0", PORT), HealthCheckHandler)
-    print(f"🌍 Server HTTP avviato su http://0.0.0.0:{PORT}/")
-    server.serve_forever()
+    """Avvia un piccolo server HTTP per il check di Render"""
+    http_port = 10001  # Render permette un solo servizio pubblico, quindi scegli una porta diversa
+    try:
+        server = HTTPServer(("0.0.0.0", http_port), HealthCheckHandler)
+        print(f"🌍 Server HTTP avviato su http://0.0.0.0:{http_port}/")
+        server.serve_forever()
+    except OSError as e:
+        print(f"⚠️ HTTP Server non avviato: {e}")
 
 if __name__ == "__main__":
     try:
