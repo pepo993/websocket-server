@@ -4,19 +4,19 @@ import os
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-PORT = int(os.getenv("PORT", 8080))  # 🔴 Render assegna automaticamente la porta
+PORT = int(os.getenv("PORT", 8080))  # 🔴 Porta WebSocket assegnata da Render
+HTTP_PORT = 10001  # 🔴 Porta del server HTTP per l'Health Check di Render
 
 async def handler(websocket, path):
     """
-    Gestisce solo connessioni WebSocket e rifiuta richieste HTTP.
+    Gestisce solo connessioni WebSocket e ignora richieste HTTP.
     """
     try:
         if "Upgrade" not in websocket.request_headers or websocket.request_headers["Upgrade"].lower() != "websocket":
-            print("❌ Connessione HTTP rifiutata (non è un WebSocket)")
-            await websocket.close(code=4001)
-            return
+            print("⚠️ Richiesta HTTP ignorata")
+            return  # 🔴 Ignoriamo la richiesta HTTP senza generare errori nei log
 
-        print("✅ Nuova connessione WebSocket")
+        print("✅ Nuova connessione WebSocket su /ws")
         async for message in websocket:
             print(f"📩 Messaggio ricevuto: {message}")
             await websocket.send(f"Echo: {message}")
@@ -26,11 +26,11 @@ async def handler(websocket, path):
 
 async def start_websocket():
     """
-    Avvia il server WebSocket.
+    Avvia il server WebSocket su Render e accetta connessioni su /ws.
     """
     server = await websockets.serve(
         handler,
-        "0.0.0.0",  # 🔴 Accetta connessioni pubbliche
+        "0.0.0.0",
         PORT
     )
     print(f"✅ WebSocket Server avviato su ws://0.0.0.0:{PORT}/ws")
@@ -39,7 +39,7 @@ async def start_websocket():
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
     """
-    Un piccolo server HTTP per far contento Render.
+    Server HTTP per l'Health Check di Render.
     """
     def do_GET(self):
         if self.path == "/":
@@ -53,11 +53,10 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 
 def start_http_server():
     """
-    Avvia un piccolo server HTTP su una porta diversa per l'health check di Render.
+    Avvia un piccolo server HTTP per far contento Render.
     """
-    http_port = 10001  # 🔴 Scegliamo una porta diversa da quella del WebSocket
-    server = HTTPServer(("0.0.0.0", http_port), HealthCheckHandler)
-    print(f"🌍 Server HTTP avviato su http://0.0.0.0:{http_port}/")
+    server = HTTPServer(("0.0.0.0", HTTP_PORT), HealthCheckHandler)
+    print(f"🌍 Server HTTP avviato su http://0.0.0.0:{HTTP_PORT}/")
     server.serve_forever()
 
 if __name__ == "__main__":
@@ -69,4 +68,3 @@ if __name__ == "__main__":
         asyncio.run(start_websocket())
     except Exception as e:
         print(f"❌ Errore nell'avvio del server: {e}")
-
