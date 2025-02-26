@@ -16,9 +16,9 @@ def log_message(message):
 async def handler(websocket, path):
     """Gestisce connessioni WebSocket e rifiuta richieste HTTP non valide."""
     try:
-        # Verifica se la connessione è WebSocket
+        # Controlla se la richiesta è effettivamente WebSocket
         if "Upgrade" not in websocket.request_headers or websocket.request_headers["Upgrade"].lower() != "websocket":
-            log_message("⚠️ Richiesta HTTP rifiutata (non WebSocket).")
+            log_message("⚠️ Connessione HTTP non valida rifiutata.")
             await websocket.close(code=4001, reason="Non è una connessione WebSocket")
             return
 
@@ -38,7 +38,7 @@ async def handler(websocket, path):
         await websocket.close(code=1011, reason=str(e))
 
 async def start_websocket():
-    """Avvia il WebSocket Server con log dettagliati."""
+    """Avvia il WebSocket Server con gestione degli errori."""
     try:
         server = await websockets.serve(
             handler,
@@ -65,6 +65,12 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             log_message(f"⚠️ Richiesta HTTP sconosciuta: {self.path}")
             self.send_response(404)
             self.end_headers()
+
+    def do_HEAD(self):
+        """Gestisce richieste HEAD per evitare errori su Render"""
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
 
 def start_http_server():
     """Avvia un piccolo server HTTP per l'health check di Render."""
