@@ -1,0 +1,12 @@
+services:
+  - name: websocket-server
+    type: web
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: python websocket_server.py
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 8002
+    healthCheckPath: ""  # 🔴 Disabilita il controllo HTTP
