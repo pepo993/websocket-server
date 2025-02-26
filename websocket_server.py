@@ -7,15 +7,6 @@ import os
 
 PORT = int(os.getenv("PORT", 8002))  # Usa la porta assegnata da Render
 
-async def handler(websocket, path):
-    async for message in websocket:
-        await websocket.send(f"Echo: {message}")
-
-start_server = websockets.serve(handler, "0.0.0.0", PORT)
-
-asyncio.get_event_loop().run_until_complete(start_server)
-asyncio.get_event_loop().run_forever()
-
 connected_clients = set()
 ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 
@@ -123,11 +114,11 @@ async def start_server():
     server = await websockets.serve(
         handler,
         "0.0.0.0",
-        8002,
+        PORT,
         ping_interval=5,  # Mantiene le connessioni attive ogni 5 secondi
         ping_timeout=None
     )
-    print("✅ WebSocket Server avviato su ws://0.0.0.0:8002/ws")
+    print(f"✅ WebSocket Server avviato su ws://0.0.0.0:{PORT}/ws")
     
     # Avvia `notify_clients()` in parallelo
     await asyncio.gather(server.wait_closed(), notify_clients())
@@ -138,4 +129,3 @@ if __name__ == "__main__":
         asyncio.run(start_server())
     except Exception as e:
         print(f"❌ Errore nell'avvio del WebSocket Server: {e}")
-
