@@ -4,8 +4,9 @@ import websockets
 import os
 import datetime
 from game_logic import load_game_data
+from aiohttp import web  # Per gestire richieste HTTP
 
-PORT = int(os.getenv("PORT", 8002))  # Usa la porta assegnata da Render
+PORT = int(os.getenv("PORT", 8002))  # Porta per il WebSocket
 connected_clients = set()
 ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 
@@ -84,7 +85,7 @@ async def handler(websocket, path):
         print(f"🔴 Client disconnesso! Totale client attivi: {len(connected_clients)}")
 
 
-async def start_server():
+async def start_websocket_server():
     """Avvia il server WebSocket."""
     server = await websockets.serve(
         handler,
@@ -94,11 +95,33 @@ async def start_server():
         ping_timeout=20
     )
     print(f"✅ WebSocket Server avviato su ws://0.0.0.0:{PORT}/ws")
-    await asyncio.gather(server.wait_closed(), notify_clients())
+    await server.wait_closed()
+
+
+async def health_check(request):
+    """Gestisce richieste HTTP HEAD/GET per il controllo di salute di Render."""
+    return web.Response(text="OK", status=200)
+
+
+async def start_http_server():
+    """Avvia un server HTTP su una porta diversa per gestire richieste di health check."""
+    app = web.Application()
+    app.router.add_get("/", health_check)  # Render può usare GET per verificare lo stato
+    app.router.add_head("/", health_check)  # Per richieste HEAD di Render
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 8080)  # Porta HTTP separata
+    await site.start()
+    print("✅ HTTP Server avviato su http://0.0.0.0:8080")
+
+
+async def main():
+    """Avvia sia il server WebSocket che il server HTTP per il health check."""
+    await asyncio.gather(start_websocket_server(), start_http_server(), notify_clients())
 
 
 if __name__ == "__main__":
     try:
-        asyncio.run(start_server())
+        asyncio.run(main())
     except Exception as e:
         print(f"❌ Errore nell'avvio del WebSocket Server: {e}")
