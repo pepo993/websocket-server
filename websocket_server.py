@@ -91,11 +91,11 @@ async def start_server():
     server = await websockets.serve(
         handler,
         "0.0.0.0",
-        8080,
+        8002,
         ping_interval=5,  
         ping_timeout=None
     )
-    print("✅ WebSocket Server avviato su ws://0.0.0.0:8080")
+    print("✅ WebSocket Server avviato su ws://0.0.0.0:8002")
 
     await asyncio.gather(server.wait_closed(), notify_clients())
 
