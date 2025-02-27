@@ -2,29 +2,39 @@ import asyncio
 import json
 import websockets
 import datetime
+import os
+from game_logic import load_game_data
 from flask import Flask
 
-from game_logic import load_game_data  # Importa la logica del gioco
+# Porta assegnata da Render
+PORT = int(os.getenv("PORT", 8002))
 
-# Inizializza Flask per Render (Serve solo per l'health check)
+# Flask server per l'Health Check richiesto da Render
 app = Flask(__name__)
 
-@app.route('/')
+@app.route("/")
 def home():
-    return "WebSocket Server is Running!", 200
+    return "WebSocket Server Running"
 
-# Variabili globali
+def start_flask():
+    """Avvia un server HTTP per le richieste di Render."""
+    app.run(host="0.0.0.0", port=10000, debug=False, use_reloader=False)
+
 connected_clients = set()
-ultimo_stato_trasmesso = None  
+ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 
 async def notify_clients():
-    """Invia aggiornamenti ai client WebSocket."""
+    """
+    Invia aggiornamenti ai client WebSocket solo se ci sono nuove informazioni.
+    """
     global ultimo_stato_trasmesso
 
     while True:
         if connected_clients:
             try:
                 game_data = load_game_data()
+                
+                # 📊 Stato attuale della partita
                 stato_attuale = {
                     "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
                     "numeri_estratti": game_data["drawn_numbers"],
@@ -35,11 +45,14 @@ async def notify_clients():
                         "vincitori": game_data.get("winners", {})
                     },
                     "players": {
-                        user_id: {"cartelle": game_data["players"][user_id]}
+                        user_id: {
+                            "cartelle": game_data["players"][user_id]
+                        }
                         for user_id in game_data["players"]
                     }
                 }
 
+                # Se lo stato non è cambiato, non inviare nulla
                 if stato_attuale == ultimo_stato_trasmesso:
                     await asyncio.sleep(2)
                     continue  
@@ -64,8 +77,11 @@ async def notify_clients():
         await asyncio.sleep(2)
 
 async def handler(websocket, path):
-    """Gestisce le connessioni WebSocket."""
+    """
+    Gestisce le connessioni WebSocket con la WebApp.
+    """
     connected_clients.add(websocket)
+    
     client_ip = websocket.remote_address[0] if websocket.remote_address else "Sconosciuto"
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
@@ -81,12 +97,18 @@ async def handler(websocket, path):
         print(f"🔴 Client disconnesso! Totale client attivi: {len(connected_clients)}")
 
 async def start_websocket():
-    """Avvia il WebSocket Server su Render."""
-    server = await websockets.serve(handler, "0.0.0.0", 10000, ping_interval=5, ping_timeout=None)
-    print("✅ WebSocket Server avviato su ws://0.0.0.0:10000")
+    """
+    Avvia il WebSocket Server su Render.
+    """
+    server = await websockets.serve(handler, "0.0.0.0", PORT, ping_interval=5, ping_timeout=None)
+    print(f"✅ WebSocket Server avviato su ws://0.0.0.0:{PORT}/ws")
+    
     await asyncio.gather(server.wait_closed(), notify_clients())
 
 if __name__ == "__main__":
-    from threading import Thread
-    Thread(target=lambda: app.run(host="0.0.0.0", port=8080)).start()  # Mini server Flask
-    asyncio.run(start_websocket())
+    try:
+        import threading
+        threading.Thread(target=start_flask, daemon=True).start()  # Avvia il server Flask
+        asyncio.run(start_websocket())
+    except Exception as e:
+        print(f"❌ Errore nell'avvio del WebSocket Server: {e}")
