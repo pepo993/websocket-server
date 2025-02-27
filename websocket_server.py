@@ -1,145 +1,69 @@
 import asyncio
 import json
 import websockets
-import datetime
-from multiprocessing import Process
-import gunicorn.app.base
-from flask import Flask
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# Importa la logica del gioco
-from game_logic import load_game_data   
-
-app = Flask(__name__)
+# Configurazione delle porte
+PORT = 8080  # Porta WebSocket per Render
+HTTP_PORT = 10001  # Porta HTTP per Render Health Check
 
 connected_clients = set()
-ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
-
-@app.route('/')
-def home():
-    return "WebSocket Server is running!"
-
-
-async def notify_clients():
-    """
-    Invia aggiornamenti ai client WebSocket solo se ci sono nuove informazioni.
-    """
-    global ultimo_stato_trasmesso  
-
-    while True:
-        if connected_clients:
-            try:
-                game_data = load_game_data()
-                
-                stato_attuale = {
-                    "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
-                    "numeri_estratti": game_data["drawn_numbers"],
-                    "game_status": {
-                        "cartelle_vendute": sum(len(p) for p in game_data["players"].values()),
-                        "jackpot": len(game_data["players"]) * 1,
-                        "giocatori_attivi": len(game_data["players"]),
-                        "vincitori": game_data.get("winners", {})
-                    },
-                    "players": {
-                        user_id: {
-                            "cartelle": game_data["players"][user_id]
-                        }
-                        for user_id in game_data["players"]
-                    }
-                }
-                
-                if stato_attuale == ultimo_stato_trasmesso:
-                    await asyncio.sleep(2)
-                    continue  
-
-                ultimo_stato_trasmesso = stato_attuale
-                message = json.dumps(stato_attuale)
-
-                disconnected_clients = set()
-                for client in connected_clients:
-                    try:
-                        await client.send(message)
-                    except Exception as e:
-                        print(f"⚠️ Errore WebSocket durante l'invio: {e}")
-                        disconnected_clients.add(client)
-                        
-                for client in disconnected_clients:
-                    connected_clients.remove(client)
-                    
-            except Exception as e:
-                print(f"❌ Errore generale in notify_clients: {e}")
-                
-        await asyncio.sleep(2)
-
 
 async def handler(websocket, path):
-    """
-    Gestisce le connessioni WebSocket con la WebApp.
-    """
-    connected_clients.add(websocket)
-    client_ip = websocket.remote_address[0] if websocket.remote_address else "Sconosciuto"
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    """Gestisce connessioni WebSocket e ignora richieste HTTP."""
+    if "Upgrade" not in websocket.request_headers or websocket.request_headers["Upgrade"].lower() != "websocket":
+        print("⚠️ Richiesta HTTP ricevuta e ignorata")
+        return  # Ignora le richieste non-WebSocket
 
-    print(f"🔗 Nuovo client connesso da {client_ip} - {timestamp}")
+    print(f"✅ Nuova connessione WebSocket accettata da {websocket.remote_address}")
+    connected_clients.add(websocket)
 
     try:
-        async for _ in websocket:
-            pass
+        async for message in websocket:
+            print(f"📩 Messaggio ricevuto: {message}")
+            await websocket.send(f"Echo: {message}")  # Risponde con lo stesso messaggio
+    except websockets.exceptions.ConnectionClosed:
+        print("🔴 Connessione chiusa")
     except Exception as e:
         print(f"⚠️ Errore WebSocket: {e}")
     finally:
         connected_clients.remove(websocket)
-        print(f"🔴 Client disconnesso! Totale client attivi: {len(connected_clients)}")
-
 
 async def start_websocket():
-    """
-    Avvia il server WebSocket con gestione avanzata delle connessioni.
-    """
-    server = await websockets.serve(
-        handler,
-        "0.0.0.0",
-        8002,
-        ping_interval=5,  
-        ping_timeout=None
-    )
-    print("✅ WebSocket Server avviato su ws://0.0.0.0:8002")
+    """Avvia il WebSocket Server sulla porta assegnata da Render."""
+    server = await websockets.serve(handler, "0.0.0.0", PORT)
+    print(f"✅ WebSocket Server avviato su ws://0.0.0.0:{PORT}/")
+    await server.wait_closed()
 
-    await asyncio.gather(server.wait_closed(), notify_clients())
+class HealthCheckHandler(BaseHTTPRequestHandler):
+    """Server HTTP per l'health check di Render."""
+    def do_GET(self):
+        if self.path == "/":
+            self.send_response(200)
+            self.send_header("Content-type", "text/plain")
+            self.end_headers()
+            self.wfile.write(b"WebSocket Server Running")
+        else:
+            self.send_response(404)
+            self.end_headers()
 
+    def do_HEAD(self):
+        """Gestisce richieste HEAD per Render Health Check."""
+        self.send_response(200)
+        self.send_header("Content-type", "text/plain")
+        self.end_headers()
 
-class StandaloneApplication(gunicorn.app.base.BaseApplication):
-    """
-    Configura Gunicorn per eseguire il server Flask in modalità produzione.
-    """
-    def __init__(self, app, options=None):
-        self.application = app
-        self.options = options or {}
-        super().__init__()
-
-    def load_config(self):
-        for key, value in self.options.items():
-            self.cfg.set(key, value)
-
-    def load(self):
-        return self.application
-
-
-def start_gunicorn():
-    """
-    Avvia Gunicorn per servire le richieste HTTP.
-    """
-    options = {
-        'bind': '0.0.0.0:10000',
-        'workers': 2
-    }
-    StandaloneApplication(app, options).run()
-
+def start_http_server():
+    """Avvia un piccolo server HTTP per l'health check di Render."""
+    server = HTTPServer(("0.0.0.0", HTTP_PORT), HealthCheckHandler)
+    print(f"🌍 Server HTTP avviato su http://0.0.0.0:{HTTP_PORT}/ per Render")
+    server.serve_forever()
 
 if __name__ == "__main__":
     try:
-        # Avvia il server Flask con Gunicorn in un processo separato
-        flask_process = Process(target=start_gunicorn)
-        flask_process.start()
+        # Avvia il server HTTP in un thread separato
+        threading.Thread(target=start_http_server, daemon=True).start()
         
         # Avvia il WebSocket Server
         asyncio.run(start_websocket())
