@@ -1,10 +1,8 @@
 services:
   - name: websocket-server
-    type: web
-    runtime: python
-    plan: free
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: python websocket_server.py
     envVars:
       - key: PORT
-        value: 8080
-    buildCommand: "pip install -r requirements.txt"
-    startCommand: "python websocket_server.py"
+        value: "10000"
