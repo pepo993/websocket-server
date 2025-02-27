@@ -5,7 +5,7 @@ import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 # Configurazione delle porte
-PORT = 8080  # Porta WebSocket per Render
+PORT = 8002  # Porta WebSocket per Render
 HTTP_PORT = 10001  # Porta HTTP per Render Health Check
 
 connected_clients = set()
