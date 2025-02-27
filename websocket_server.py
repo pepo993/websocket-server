@@ -8,10 +8,6 @@ from game_logic import load_game_data
 connected_clients = set()
 ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 
-# Configura SSL per WSS
-ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-ssl_context.load_cert_chain(certfile="fullchain.pem", keyfile="privkey.pem")
-
 async def notify_clients():
     """
     Invia aggiornamenti ai client WebSocket solo se ci sono nuove informazioni.
@@ -104,17 +100,17 @@ async def handler(websocket, path):
 
 async def start_server():
     """
-    Avvia il server WebSocket con supporto WSS.
+    Avvia il server WebSocket 
     """
     server = await websockets.serve(
         handler,
         "0.0.0.0",
         8002,
-        ssl=ssl_context,  # Abilita WSS
+
         ping_interval=5,
         ping_timeout=None
     )
-    print("✅ WebSocket Server avviato su wss://0.0.0.0:8002/ws")
+    print("✅ WebSocket Server avviato su ws://0.0.0.0:8002/ws")
     
     await asyncio.gather(server.wait_closed(), notify_clients())
 
