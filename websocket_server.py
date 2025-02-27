@@ -60,23 +60,28 @@ async def notify_clients():
 
 
 async def handler(websocket, path):
-    """
-    Gestisce le connessioni WebSocket con la WebApp.
-    """
-    connected_clients.add(websocket)
-    client_ip = websocket.remote_address[0] if websocket.remote_address else "Sconosciuto"
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-
-    print(f"🔗 Nuovo client connesso da {client_ip} - {timestamp}")
-
+    """Gestisce connessioni WebSocket con logging dettagliato."""
     try:
-        async for _ in websocket:
-            pass
+        if "Upgrade" not in websocket.request_headers or websocket.request_headers["Upgrade"].lower() != "websocket":
+            print("⚠️ Richiesta HTTP ricevuta e ignorata")
+            return
+
+        print(f"✅ Nuova connessione WebSocket da {websocket.remote_address}")
+
+        connected_clients.add(websocket)
+        
+        async for message in websocket:
+            print(f"📩 Messaggio ricevuto: {message}")
+            await websocket.send(f"Echo: {message}")
+
+    except websockets.exceptions.ConnectionClosed as e:
+        print(f"🔴 Connessione chiusa: codice {e.code}, motivo: {e.reason}")
     except Exception as e:
         print(f"⚠️ Errore WebSocket: {e}")
     finally:
         connected_clients.remove(websocket)
-        print(f"🔴 Client disconnesso! Totale client attivi: {len(connected_clients)}")
+        print(f"🔴 Client disconnesso. Totale attivi: {len(connected_clients)}")
+
 
 
 async def start_server():
