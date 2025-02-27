@@ -8,4 +8,4 @@ services:
     autoDeploy: true
     envVars:
       - key: PORT
-        value: 8002
+        value: 8080
