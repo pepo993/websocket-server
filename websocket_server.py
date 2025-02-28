@@ -7,7 +7,8 @@ from game_logic import load_game_data
 
 # Assicura che la cartella "data/" esista
 os.makedirs("data", exist_ok=True)
-
+# Percorso unificato per il file di stato
+game_data_path = os.path.join("data", "game_data.json")
 # Ottieni la porta assegnata da Railway
 PORT = int(os.getenv("PORT", 8002))
 
