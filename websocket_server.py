@@ -64,7 +64,7 @@ async def notify_clients():
         
         await asyncio.sleep(2)
 
-async def handler(websocket):
+async def handler(websocket, path):
     connected_clients.add(websocket)
     print(f"Nuovo client connesso! Totale: {len(connected_clients)}")
     try:
