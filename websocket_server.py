@@ -64,7 +64,7 @@ async def notify_clients():
         
         await asyncio.sleep(2)
 
-async def handler(websocket, path):
+async def handler(websocket):
     connected_clients.add(websocket)
     print(f"Nuovo client connesso! Totale: {len(connected_clients)}")
     try:
@@ -82,7 +82,7 @@ async def handler(websocket, path):
         print(f"Client disconnesso! Totale attivi: {len(connected_clients)}")
 
 async def start_server():
-    server = await websockets.serve(handler, "0.0.0.0", PORT)
+    server = await websockets.serve(handler, "0.0.0.0", PORT, subprotocols=["binary"])
     print(f"WebSocket Server avviato su ws://0.0.0.0:{PORT}/ws")
     await asyncio.gather(server.wait_closed(), notify_clients())
 
