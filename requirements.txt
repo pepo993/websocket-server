@@ -1,6 +1,5 @@
 aiogram
 websockets
 asyncio
-json
 logging
 python-dotenv
