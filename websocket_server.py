@@ -76,7 +76,7 @@ async def notify_clients():
                     print("❌ Errore: Dati del gioco non validi.")
                     await asyncio.sleep(2)
                     continue  
-
+                
                 stato_attuale = {
                     "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
                     "numeri_estratti": game_data["drawn_numbers"],
@@ -91,6 +91,8 @@ async def notify_clients():
                         for user_id in game_data.get("players", {})
                     }
                 }
+
+                print(f"📤 Dati inviati ai client WebSocket: {json.dumps(stato_attuale, indent=2)}")
 
                 # Se lo stato è invariato, non inviare aggiornamenti
                 if stato_attuale == ultimo_stato_trasmesso:
