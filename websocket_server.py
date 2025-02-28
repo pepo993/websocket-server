@@ -53,10 +53,8 @@ async def start_websocket():
         print(f"❌ Errore nell'avvio del WebSocket Server: {e}")
 
 if __name__ == "__main__":
-    # Avvia Flask in un thread separato
-    flask_thread = Thread(target=run_flask)
-    flask_thread.start()
-
-    # Avvia il WebSocket server
-    asyncio.run(start_websocket())
-
+    # Avvia WebSocket in un thread separato
+    websocket_thread = Thread(target=lambda: asyncio.run(start_websocket()))
+    websocket_thread.start()
+    
+    # Flask verrà eseguito con Gunicorn, quindi non avviamo direttamente app.run()
