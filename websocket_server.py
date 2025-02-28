@@ -13,7 +13,7 @@ connected_clients = set()
 ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 
 async def handler(websocket, path):
-    """ Gestisce le connessioni WebSocket """
+    """ Gestisce le connessioni WebSocket (path incluso per evitare errori) """
     connected_clients.add(websocket)
     print(f"Nuovo client connesso! Totale: {len(connected_clients)}")
     
@@ -93,7 +93,7 @@ app = web.Application()
 app.router.add_get('/health', health_check)
 
 async def start_server():
-    # Rimuoviamo `subprotocols` per evitare il problema della negoziazione
+    # Creiamo il server WebSocket con il parametro `path` corretto
     websocket_server = await websockets.serve(handler, "0.0.0.0", PORT)
     print(f"WebSocket Server avviato su ws://0.0.0.0:{PORT}/ws")
 
