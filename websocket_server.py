@@ -1,76 +1,109 @@
-import os
 import asyncio
 import json
 import websockets
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import os
+import datetime
 from game_logic import load_game_data
 
 connected_clients = set()
+ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 
-class HealthCheckHandler(BaseHTTPRequestHandler):
+async def notify_clients():
     """
-    Server HTTP per rispondere ai controlli di stato di Render.
+    Invia aggiornamenti ai client WebSocket solo se ci sono nuove informazioni.
     """
-    def do_GET(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "text/plain")
-        self.end_headers()
-        self.wfile.write(b"OK")
+    global ultimo_stato_trasmesso  
 
-    def do_HEAD(self):
-        self.send_response(200)
-        self.send_header("Content-Type", "text/plain")
-        self.end_headers()
+    while True:
+        if connected_clients:
+            try:
+                game_data = load_game_data()
 
-def start_health_check_server():
-    """
-    Avvia un piccolo server HTTP sulla porta 8080 per rispondere alle richieste di Render.
-    """
-    server = HTTPServer(("0.0.0.0", 8080), HealthCheckHandler)
-    print("✅ Health Check Server avviato su http://0.0.0.0:8080/")
-    server.serve_forever()
+                # 📊 Crea lo stato attuale del gioco con tutti i dati
+                stato_attuale = {
+                    "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
+                    "numeri_estratti": game_data["drawn_numbers"],  
+                    "game_status": {
+                        "cartelle_vendute": sum(len(p) for p in game_data["players"].values()),
+                        "jackpot": len(game_data["players"]) * 1,
+                        "giocatori_attivi": len(game_data["players"]),
+                        "vincitori": game_data.get("winners", {})
+                    },
+                    "players": {
+                        user_id: {
+                            "cartelle": game_data["players"][user_id],
+                        }
+                        for user_id in game_data["players"]
+                    }
+                }
+
+                # 🔄 Se lo stato non è cambiato, non inviare nulla
+                if stato_attuale == ultimo_stato_trasmesso:
+                    await asyncio.sleep(2)
+                    continue  
+
+                ultimo_stato_trasmesso = stato_attuale
+                message = json.dumps(stato_attuale)
+
+                # 🚀 Invia aggiornamenti ai client WebSocket
+                disconnected_clients = set()
+                for client in connected_clients:
+                    try:
+                        await client.send(message)
+                    except Exception as e:
+                        print(f"⚠️ Errore WebSocket durante l'invio: {e}")
+                        disconnected_clients.add(client)
+
+                # Rimuove i client disconnessi
+                for client in disconnected_clients:
+                    connected_clients.remove(client)
+
+            except Exception as e:
+                print(f"❌ Errore generale in notify_clients: {e}")
+
+        await asyncio.sleep(2)  # Mantiene aggiornamenti costanti
+
 
 async def handler(websocket, path):
     """
-    Accetta SOLO connessioni WebSocket su `/ws`.
+    Gestisce le connessioni WebSocket con la WebApp.
     """
-    if path != "/ws":
-        print(f"❌ Connessione rifiutata: {path} non è un WebSocket valido")
-        await websocket.close()
-        return
-
     connected_clients.add(websocket)
-    print(f"✅ Nuovo client connesso! Totale: {len(connected_clients)}")
+
+    client_ip = websocket.remote_address[0] if websocket.remote_address else "Sconosciuto"
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+    print(f"""
+🔗 **Nuovo client connesso!**
+📍 **IP:** {client_ip}
+⏳ **Timestamp:** {timestamp}
+👥 **Client totali connessi:** {len(connected_clients)}
+""")
 
     try:
-        async for message in websocket:
-            print(f"📩 Messaggio ricevuto: {message}")
-            await websocket.send(json.dumps({"response": "Messaggio ricevuto"}))
-    except websockets.ConnectionClosed:
-        print("🔴 Connessione WebSocket chiusa")
+        async for _ in websocket:
+            pass  # Mantiene la connessione attiva
+    except Exception as e:
+        print(f"⚠️ Errore WebSocket: {e}")
     finally:
         connected_clients.remove(websocket)
-        print(f"🔌 Client disconnesso! Totale attivi: {len(connected_clients)}")
+        print(f"🔴 Client disconnesso! Totale client attivi: {len(connected_clients)}")
 
-async def main():
+
+async def start_server():
     """
-    Avvia il WebSocket Server su Render con porta dedicata.
+    Avvia il server WebSocket con gestione avanzata delle connessioni.
     """
-    PORT = int(os.environ.get("PORT", 10000))  # Porta dedicata per WebSocket
+    PORT = int(os.environ.get("PORT", 8002))  # Render assegna la porta dinamicamente
+    server = await websockets.serve(handler, "0.0.0.0", PORT, ping_interval=5, ping_timeout=None)
 
-    threading.Thread(target=start_health_check_server, daemon=True).start()
-
-    server = await websockets.serve(
-        handler,
-        "0.0.0.0",
-        PORT,
-        subprotocols=["binary"]
-    )
     print(f"✅ WebSocket Server avviato su ws://0.0.0.0:{PORT}/ws")
 
-    await server.wait_closed()
+    await asyncio.gather(server.wait_closed(), notify_clients())
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
-
+    try:
+        asyncio.run(start_server())
+    except Exception as e:
+        print(f"❌ Errore nell'avvio del WebSocket Server: {e}")
