@@ -2,6 +2,7 @@ import asyncio
 import json
 import websockets
 import os
+import datetime
 from game_logic import load_game_data
 
 # Ottieni la porta dinamica assegnata da Railway
@@ -16,7 +17,7 @@ async def notify_clients():
         if connected_clients:
             try:
                 game_data = load_game_data()
-                
+
                 if not game_data or "drawn_numbers" not in game_data:
                     print("Errore: Dati del gioco non validi.")
                     await asyncio.sleep(2)
@@ -81,12 +82,14 @@ async def handler(websocket, path):
         print(f"Client disconnesso! Totale attivi: {len(connected_clients)}")
 
 async def start_server():
-    async with websockets.serve(handler, "0.0.0.0", PORT, subprotocols=["websocket"]):
-        print(f"WebSocket Server avviato su ws://0.0.0.0:{PORT}/ws")
-        await asyncio.gather(notify_clients())
+    server = await websockets.serve(handler, "0.0.0.0", PORT)
+    print(f"WebSocket Server avviato su ws://0.0.0.0:{PORT}/ws")
+    await asyncio.gather(server.wait_closed(), notify_clients())
 
 if __name__ == "__main__":
     try:
         asyncio.run(start_server())
     except Exception as e:
         print(f"Errore nell'avvio del WebSocket Server: {e}")
+
+
