@@ -25,7 +25,7 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 
 def start_health_check_server():
     """
-    Avvia un server HTTP sulla porta 8080 per rispondere alle richieste di Render.
+    Avvia un piccolo server HTTP sulla porta 8080 per rispondere alle richieste di Render.
     """
     server = HTTPServer(("0.0.0.0", 8080), HealthCheckHandler)
     print("✅ Health Check Server avviato su http://0.0.0.0:8080/")
@@ -55,9 +55,9 @@ async def handler(websocket, path):
 
 async def main():
     """
-    Avvia il WebSocket Server e il Health Check Server.
+    Avvia il WebSocket Server su Render con porta dedicata.
     """
-    PORT = int(os.environ.get("PORT", 10000))
+    PORT = int(os.environ.get("PORT", 10000))  # Porta dedicata per WebSocket
 
     threading.Thread(target=start_health_check_server, daemon=True).start()
 
@@ -68,8 +68,9 @@ async def main():
         subprotocols=["binary"]
     )
     print(f"✅ WebSocket Server avviato su ws://0.0.0.0:{PORT}/ws")
-    
+
     await server.wait_closed()
 
 if __name__ == "__main__":
     asyncio.run(main())
+
