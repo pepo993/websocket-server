@@ -66,7 +66,7 @@ async def handler(websocket):
         print(f"❌ Client disconnesso! Totale attivi: {len(connected_clients)}")
 
 async def notify_clients():
-    """ Invia i dati ai client WebSocket ogni 2 secondi """
+    """ Invia i dati ai client WebSocket ogni 2 secondi, filtrando per ogni giocatore. """
     global ultimo_stato_trasmesso  
     while True:
         if connected_clients:
@@ -76,50 +76,36 @@ async def notify_clients():
                     print("❌ Errore: Dati del gioco non validi.")
                     await asyncio.sleep(2)
                     continue  
-                
-                stato_attuale = {
-                    "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
-                    "numeri_estratti": game_data["drawn_numbers"],
-                    "game_status": {
-                        "cartelle_vendute": sum(len(p) for p in game_data.get("players", {}).values()),
-                        "jackpot": len(game_data.get("players", {})) * 1,
-                        "giocatori_attivi": len(game_data.get("players", {})),
-                        "vincitori": game_data.get("winners", {})
-                    },
-                    "players": {
-                        user_id: {"cartelle": game_data["players"][user_id]}
-                        for user_id in game_data.get("players", {})
-                    }
-                }
 
-                print(f"📤 Dati inviati ai client WebSocket: {json.dumps(stato_attuale, indent=2)}")
-
-                # Se lo stato è invariato, non inviare aggiornamenti
-                if stato_attuale == ultimo_stato_trasmesso:
-                    await asyncio.sleep(2)
-                    continue  
-
-                ultimo_stato_trasmesso = stato_attuale
-                message = json.dumps(stato_attuale)
-
-                disconnected_clients = set()
                 for client in connected_clients:
                     try:
-                        await client.send(message)
+                        user_id = getattr(client, "user_id", None)  # Identifica l'utente
+                        if user_id and user_id in game_data["players"]:
+                            stato_attuale = {
+                                "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
+                                "numeri_estratti": game_data["drawn_numbers"],
+                                "game_status": {
+                                    "cartelle_vendute": sum(len(p) for p in game_data.get("players", {}).values()),
+                                    "jackpot": len(game_data.get("players", {})) * 1,
+                                    "giocatori_attivi": len(game_data.get("players", {})),
+                                    "vincitori": game_data.get("winners", {})
+                                },
+                                "players": {
+                                    user_id: {"cartelle": game_data["players"][user_id]}  # SOLO LE CARTELLE DELL'UTENTE
+                                }
+                            }
+                            await client.send(json.dumps(stato_attuale))
+
                     except websockets.exceptions.ConnectionClosedError as e:
-                        print(f"❌ Errore WebSocket durante l'invio: {e}")
-                        disconnected_clients.add(client)
+                        print(f"❌ Errore WebSocket durante l'invio a {user_id}: {e}")
                     except Exception as e:
-                        print(f"❌ Errore generico durante l'invio: {e}")
-                        disconnected_clients.add(client)
-                        
-                for client in disconnected_clients:
-                    connected_clients.remove(client)
+                        print(f"❌ Errore generico durante l'invio a {user_id}: {e}")
 
             except Exception as e:
                 print(f"❌ Errore generale in notify_clients: {e}")
 
         await asyncio.sleep(2)
+
 
 # Endpoint di health check per Railway
 async def health_check(request):
