@@ -1,6 +1,10 @@
 import asyncio
+import os
 import websockets
 from aiohttp import web
+
+# Recupera la porta assegnata da Render
+PORT = int(os.getenv("PORT", 8080))  # Render assegna dinamicamente la porta
 
 # Health check per Render
 async def health_check(request):
@@ -13,8 +17,7 @@ app.router.add_get('/health', health_check)
 # Gestione delle connessioni WebSocket
 connected_clients = set()
 
-async def websocket_handler(websocket, path):
-    # Aggiungi il client alla lista delle connessioni attive
+async def websocket_handler(websocket):
     connected_clients.add(websocket)
     print(f"Nuova connessione WebSocket: {websocket.remote_address}")
     try:
@@ -24,16 +27,15 @@ async def websocket_handler(websocket, path):
     except websockets.exceptions.ConnectionClosed as e:
         print(f"Connessione chiusa: {e}")
     finally:
-        # Rimuovi il client disconnesso
         connected_clients.remove(websocket)
         print("Client disconnesso")
 
 async def main():
-    # Avvia il server WebSocket sulla porta 8000
-    server = await websockets.serve(websocket_handler, "0.0.0.0", 8000)
-    print("Server WebSocket in ascolto sulla porta 8000")
-    
-    # Avvia il server HTTP per il health check sulla porta 8080
+    # Avvia il server WebSocket sulla porta assegnata da Render
+    server = await websockets.serve(websocket_handler, "0.0.0.0", PORT)
+    print(f"Server WebSocket in ascolto sulla porta {PORT}")
+
+    # Avvia il server HTTP per il health check
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", 8080)
