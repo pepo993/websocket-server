@@ -3,3 +3,4 @@ websockets
 asyncio
 logging
 python-dotenv
+flask
