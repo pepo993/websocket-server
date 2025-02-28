@@ -1,50 +1,80 @@
 import asyncio
-import os
+import json
 import websockets
-from aiohttp import web
+import os
+import datetime
+from game_logic import load_game_data
 
-# Recupera la porta assegnata da Render
-PORT = int(os.getenv("PORT", 8080))  # Render assegna dinamicamente la porta
+# Ottieni la porta dinamica assegnata da Railway
+PORT = int(os.getenv("PORT", 8002))
 
-# Health check per Render
-async def health_check(request):
-    return web.Response(text="OK", status=200)
-
-# Server HTTP per rispondere alle richieste di Render
-app = web.Application()
-app.router.add_get('/health', health_check)
-
-# Gestione delle connessioni WebSocket
 connected_clients = set()
+ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 
-async def websocket_handler(websocket):
+async def notify_clients():
+    global ultimo_stato_trasmesso  
+    while True:
+        if connected_clients:
+            try:
+                game_data = load_game_data()
+                
+                stato_attuale = {
+                    "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
+                    "numeri_estratti": game_data["drawn_numbers"],
+                    "game_status": {
+                        "cartelle_vendute": sum(len(p) for p in game_data["players"].values()),
+                        "jackpot": len(game_data["players"]) * 1,
+                        "giocatori_attivi": len(game_data["players"]),
+                        "vincitori": game_data.get("winners", {})
+                    },
+                    "players": {
+                        user_id: {"cartelle": game_data["players"][user_id]}
+                        for user_id in game_data["players"]
+                    }
+                }
+                
+                if stato_attuale == ultimo_stato_trasmesso:
+                    await asyncio.sleep(2)
+                    continue  
+                
+                ultimo_stato_trasmesso = stato_attuale
+                message = json.dumps(stato_attuale)
+                
+                disconnected_clients = set()
+                for client in connected_clients:
+                    try:
+                        await client.send(message)
+                    except Exception as e:
+                        print(f"Errore WebSocket durante l'invio: {e}")
+                        disconnected_clients.add(client)
+                        
+                for client in disconnected_clients:
+                    connected_clients.remove(client)
+                    
+            except Exception as e:
+                print(f"Errore generale in notify_clients: {e}")
+        
+        await asyncio.sleep(2)
+
+async def handler(websocket, path):
     connected_clients.add(websocket)
-    print(f"Nuova connessione WebSocket: {websocket.remote_address}")
+    print(f"Nuovo client connesso! Totale: {len(connected_clients)}")
     try:
-        async for message in websocket:
-            print(f"Messaggio ricevuto: {message}")
-            await websocket.send(f"Echo: {message}")  # Risponde con un echo
-    except websockets.exceptions.ConnectionClosed as e:
-        print(f"Connessione chiusa: {e}")
+        async for _ in websocket:
+            pass  # Mantiene la connessione attiva
+    except Exception as e:
+        print(f"Errore WebSocket: {e}")
     finally:
         connected_clients.remove(websocket)
-        print("Client disconnesso")
+        print(f"Client disconnesso! Totale attivi: {len(connected_clients)}")
 
-async def main():
-    # Avvia il server WebSocket sulla porta assegnata da Render
-    server = await websockets.serve(websocket_handler, "0.0.0.0", PORT)
-    print(f"Server WebSocket in ascolto sulla porta {PORT}")
-
-    # Avvia il server HTTP per il health check
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 8080)
-    await site.start()
-    print("Health check attivo sulla porta 8080")
-
-    await asyncio.Future()  # Mantieni il server attivo
+async def start_server():
+    server = await websockets.serve(handler, "0.0.0.0", PORT, ping_interval=5, ping_timeout=None)
+    print(f"WebSocket Server avviato su ws://0.0.0.0:{PORT}/ws")
+    await asyncio.gather(server.wait_closed(), notify_clients())
 
 if __name__ == "__main__":
-    asyncio.run(main())
-
-    # Flask verrà eseguito con Gunicorn, quindi non avviamo direttamente app.run()
+    try:
+        asyncio.run(start_server())
+    except Exception as e:
+        print(f"Errore nell'avvio del WebSocket Server: {e}")
