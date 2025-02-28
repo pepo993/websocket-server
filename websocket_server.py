@@ -1,60 +1,48 @@
 import asyncio
-import json
 import websockets
-import os
-import datetime
-from flask import Flask
-from threading import Thread
-from game_logic import load_game_data
+from aiohttp import web
 
-# Mini server Flask per rispondere a richieste HTTP
-app = Flask(__name__)
+# Health check per Render
+async def health_check(request):
+    return web.Response(text="OK", status=200)
 
-@app.route("/")
-def home():
-    return "WebSocket Server is running!", 200
+# Server HTTP per rispondere alle richieste di Render
+app = web.Application()
+app.router.add_get('/health', health_check)
 
-@app.route("/health")
-def health_check():
-    return "OK", 200
-
-def run_flask():
-    """Avvia Flask in un thread separato."""
-    flask_port = int(os.environ.get("FLASK_PORT", 5000))
-    app.run(host="0.0.0.0", port=flask_port)
-
-# WebSocket Server
+# Gestione delle connessioni WebSocket
 connected_clients = set()
 
-async def handler(websocket, path):
-    """Gestisce le connessioni WebSocket."""
+async def websocket_handler(websocket, path):
+    # Aggiungi il client alla lista delle connessioni attive
+    connected_clients.add(websocket)
+    print(f"Nuova connessione WebSocket: {websocket.remote_address}")
     try:
-        connected_clients.add(websocket)
-        client_ip = websocket.remote_address[0] if websocket.remote_address else "Sconosciuto"
-        print(f"🔗 Nuovo client connesso da {client_ip}")
-
         async for message in websocket:
-            print(f"📩 Messaggio ricevuto: {message}")
-
-    except websockets.exceptions.ConnectionClosedError as e:
-        print(f"⚠️ Errore di connessione WebSocket: {e}")
+            print(f"Messaggio ricevuto: {message}")
+            await websocket.send(f"Echo: {message}")  # Risponde con un echo
+    except websockets.exceptions.ConnectionClosed as e:
+        print(f"Connessione chiusa: {e}")
     finally:
-        connected_clients.discard(websocket)
-        print(f"🔴 Client disconnesso! Totale client attivi: {len(connected_clients)}")
+        # Rimuovi il client disconnesso
+        connected_clients.remove(websocket)
+        print("Client disconnesso")
 
-async def start_websocket():
-    """Avvia il WebSocket Server."""
-    try:
-        WS_PORT = int(os.environ.get("WS_PORT", 8002))  # Porta WebSocket assegnata da Render
-        server = await websockets.serve(handler, "0.0.0.0", WS_PORT)
-        print(f"✅ WebSocket Server avviato su ws://0.0.0.0:{WS_PORT}/ws")
-        await server.wait_closed()
-    except Exception as e:
-        print(f"❌ Errore nell'avvio del WebSocket Server: {e}")
+async def main():
+    # Avvia il server WebSocket sulla porta 8000
+    server = await websockets.serve(websocket_handler, "0.0.0.0", 8000)
+    print("Server WebSocket in ascolto sulla porta 8000")
+    
+    # Avvia il server HTTP per il health check sulla porta 8080
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 8080)
+    await site.start()
+    print("Health check attivo sulla porta 8080")
+
+    await asyncio.Future()  # Mantieni il server attivo
 
 if __name__ == "__main__":
-    # Avvia WebSocket in un thread separato
-    websocket_thread = Thread(target=lambda: asyncio.run(start_websocket()))
-    websocket_thread.start()
-    
+    asyncio.run(main())
+
     # Flask verrà eseguito con Gunicorn, quindi non avviamo direttamente app.run()
