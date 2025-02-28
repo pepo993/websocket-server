@@ -4,4 +4,4 @@ asyncio
 logging
 python-dotenv
 flask
-gunicorn
+
