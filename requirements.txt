@@ -1,3 +1,6 @@
+aiogram
 websockets
 asyncio
-aiogram
+json
+logging
+python-dotenv
