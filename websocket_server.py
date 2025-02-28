@@ -93,8 +93,8 @@ app = web.Application()
 app.router.add_get('/health', health_check)
 
 async def start_server():
-    # Avvia il server WebSocket
-    websocket_server = await websockets.serve(handler, "0.0.0.0", PORT, subprotocols=["binary"])
+    # Rimuoviamo `subprotocols` per evitare il problema della negoziazione
+    websocket_server = await websockets.serve(handler, "0.0.0.0", PORT)
     print(f"WebSocket Server avviato su ws://0.0.0.0:{PORT}/ws")
 
     # Avvia il server HTTP per l'health check
