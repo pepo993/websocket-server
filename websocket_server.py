@@ -74,7 +74,7 @@ async def notify_clients():
                 game_data = load_game_state()
                 if not game_data or "drawn_numbers" not in game_data:
                     print("❌ Errore: Dati del gioco non validi.")
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(5)
                     continue  
                 
                 stato_attuale = {
@@ -96,7 +96,7 @@ async def notify_clients():
 
                 # Se lo stato è invariato, non inviare aggiornamenti
                 if stato_attuale == ultimo_stato_trasmesso:
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(5)
                     continue  
 
                 ultimo_stato_trasmesso = stato_attuale
