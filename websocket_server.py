@@ -4,7 +4,12 @@ import asyncio
 import websockets
 from database import connect_db
 from aiohttp import web
+import sys
 
+# Aggiunge il percorso della cartella corrente per trovare database.py
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+from database import connect_db  # Ora Python dovrebbe trovarlo
 # Ottieni la porta assegnata da Railway
 PORT = int(os.getenv("PORT", 8002))
 
