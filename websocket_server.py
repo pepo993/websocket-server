@@ -74,7 +74,7 @@ async def notify_clients():
                 game_data = load_game_state()
                 if not game_data or "drawn_numbers" not in game_data:
                     print("❌ Errore: Dati del gioco non validi.")
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(2)
                     continue  
                 
                 stato_attuale = {
@@ -96,7 +96,7 @@ async def notify_clients():
 
                 # Se lo stato è invariato, non inviare aggiornamenti
                 if stato_attuale == ultimo_stato_trasmesso:
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(2)
                     continue  
 
                 ultimo_stato_trasmesso = stato_attuale
@@ -119,7 +119,7 @@ async def notify_clients():
             except Exception as e:
                 print(f"❌ Errore generale in notify_clients: {e}")
 
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
 
 # Endpoint di health check per Railway
 async def health_check(request):
