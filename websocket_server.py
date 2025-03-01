@@ -135,5 +135,3 @@ if __name__ == "__main__":
         asyncio.run(start_server())
     except Exception as e:
         print(f"❌ Errore nell'avvio del WebSocket Server: {e}")
-
-
