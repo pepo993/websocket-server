@@ -2,59 +2,14 @@ import os
 import json
 import asyncio
 import websockets
-from database import connect_db
 from aiohttp import web
-import sys
-import sqlite3
 
-DB_PATH = "data/bingoton.db"
-
-# 🔹 Assicura che la cartella esista
+# Assicura che la cartella "data/" esista
 os.makedirs("data", exist_ok=True)
 
-def connect_db():
-    """ Crea la connessione al database """
-    return sqlite3.connect(DB_PATH, check_same_thread=False)
+# Percorso unificato per il file di stato
+game_data_path = os.path.join("data", "game_data.json")
 
-def setup_database():
-    """ Crea le tabelle se non esistono """
-    conn = connect_db()
-    cursor = conn.cursor()
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS game_state (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            game_active BOOLEAN DEFAULT 0,
-            drawn_numbers TEXT DEFAULT '[]'
-        )
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS players (
-            user_id INTEGER,
-            game_id INTEGER,
-            cartelle TEXT,
-            PRIMARY KEY (user_id, game_id)
-        )
-    """)
-
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS transactions (
-            user_id INTEGER PRIMARY KEY,
-            deposits REAL DEFAULT 0,
-            withdrawals REAL DEFAULT 0
-        )
-    """)
-
-    conn.commit()
-    conn.close()
-
-setup_database()
-
-# Aggiunge il percorso della cartella corrente per trovare database.py
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-from database import connect_db  # Ora Python dovrebbe trovarlo
 # Ottieni la porta assegnata da Railway
 PORT = int(os.getenv("PORT", 8002))
 
@@ -62,117 +17,123 @@ PORT = int(os.getenv("PORT", 8002))
 connected_clients = set()
 ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 
-def get_game_data():
-    """Recupera lo stato del gioco dal database SQLite."""
-    conn = connect_db()
-    cursor = conn.cursor()
+# Funzione per caricare lo stato di gioco
+def load_game_state():
+    if os.path.exists(game_data_path):
+        with open(game_data_path, "r") as f:
+            return json.load(f)
+    return {"drawn_numbers": [], "players": {}, "winners": {}}
 
-    cursor.execute("SELECT game_active, drawn_numbers FROM game_state ORDER BY id DESC LIMIT 1")
-    row = cursor.fetchone()
+# Funzione per salvare lo stato di gioco
+def save_game_state(state):
+    with open(game_data_path, "w") as f:
+        json.dump(state, f, indent=4)
+
+async def handler(websocket):
+    """ Gestisce le connessioni WebSocket """
+    connected_clients.add(websocket)
+    print(f"✅ Nuovo client connesso! Totale: {len(connected_clients)}")
+
+    try:
+        async for message in websocket:
+            print(f"📥 Messaggio ricevuto: {message}")
+            
+            # Verifica se il messaggio contiene dati di aggiornamento dal bot Telegram
+            try:
+                game_state = json.loads(message)
+                if "drawn_numbers" in game_state:  # Controlla che sia un aggiornamento valido
+                    save_game_state(game_state)  # ✅ Salva il nuovo stato ricevuto dal bot
+                    print("📌 Stato di gioco aggiornato con nuovi numeri estratti.")
+                    
+                    # Invia il nuovo stato a tutti i client connessi
+                    broadcast_message = json.dumps(game_state)
+                    for client in connected_clients:
+                        await client.send(broadcast_message)
+
+            except json.JSONDecodeError:
+                print("❌ Errore: Messaggio ricevuto non è un JSON valido.")
+            
+            await websocket.send(json.dumps({"status": "ok", "message": "Messaggio ricevuto"}))
     
-    if row:
-        game_active, drawn_numbers = row
-        return {
-            "game_active": bool(game_active),
-            "drawn_numbers": json.loads(drawn_numbers)
-        }
-    
-    return {"game_active": False, "drawn_numbers": []}
-
-def get_players_data():
-    """Recupera i giocatori e le loro cartelle dal database."""
-    conn = connect_db()
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT user_id, cartelle FROM players")
-    players = {}
-
-    for user_id, cartelle in cursor.fetchall():
-        players[user_id] = {"cartelle": json.loads(cartelle)}
-
-    return players
+    except websockets.exceptions.ConnectionClosedOK:
+        print("⚠️ Client disconnesso normalmente.")
+    except websockets.exceptions.ConnectionClosedError as e:
+        print(f"❌ Errore di connessione WebSocket: {e}")
+    except Exception as e:
+        print(f"❌ Errore generale WebSocket: {e}")
+    finally:
+        connected_clients.remove(websocket)
+        print(f"❌ Client disconnesso! Totale attivi: {len(connected_clients)}")
 
 async def notify_clients():
-    """Invia aggiornamenti ai client WebSocket solo se ci sono nuove informazioni."""
+    """ Invia i dati ai client WebSocket ogni 2 secondi, filtrando per ogni giocatore. """
     global ultimo_stato_trasmesso  
-
     while True:
         if connected_clients:
             try:
-                game_data = get_game_data()
-                players_data = get_players_data()
-
-                stato_attuale = {
-                    "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
-                    "numeri_estratti": game_data["drawn_numbers"],
-                    "game_status": {
-                        "cartelle_vendute": sum(len(p["cartelle"]) for p in players_data.values()),
-                        "jackpot": sum(len(p["cartelle"]) for p in players_data.values()),
-                        "giocatori_attivi": len(players_data),
-                    },
-                    "players": players_data
-                }
-
-                if stato_attuale == ultimo_stato_trasmesso:
+                game_data = load_game_state()
+                if not game_data or "drawn_numbers" not in game_data:
+                    print("❌ Errore: Dati del gioco non validi.")
                     await asyncio.sleep(2)
                     continue  
 
-                ultimo_stato_trasmesso = stato_attuale
-                message = json.dumps(stato_attuale)
-
-                disconnected_clients = set()
                 for client in connected_clients:
                     try:
-                        await client.send(message)
-                    except Exception as e:
-                        print(f"⚠️ Errore WebSocket durante l'invio: {e}")
-                        disconnected_clients.add(client)
+                        user_id = getattr(client, "user_id", None)  # Identifica l'utente
+                        if user_id and user_id in game_data["players"]:
+                            stato_attuale = {
+                                "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
+                                "numeri_estratti": game_data["drawn_numbers"],
+                                "game_status": {
+                                    "cartelle_vendute": sum(len(p) for p in game_data.get("players", {}).values()),
+                                    "jackpot": len(game_data.get("players", {})) * 1,
+                                    "giocatori_attivi": len(game_data.get("players", {})),
+                                    "vincitori": game_data.get("winners", {})
+                                },
+                                "players": {
+                                    user_id: {"cartelle": game_data["players"][user_id]}  # SOLO LE CARTELLE DELL'UTENTE
+                                }
+                            }
+                            await client.send(json.dumps(stato_attuale))
 
-                for client in disconnected_clients:
-                    connected_clients.remove(client)
+                    except websockets.exceptions.ConnectionClosedError as e:
+                        print(f"❌ Errore WebSocket durante l'invio a {user_id}: {e}")
+                    except Exception as e:
+                        print(f"❌ Errore generico durante l'invio a {user_id}: {e}")
 
             except Exception as e:
                 print(f"❌ Errore generale in notify_clients: {e}")
 
         await asyncio.sleep(2)
 
-async def handler(websocket):
-    """Gestisce le connessioni WebSocket con la WebApp."""
-    connected_clients.add(websocket)
 
-    client_ip = websocket.remote_address[0] if websocket.remote_address else "Sconosciuto"
-    print(f"✅ Nuovo client connesso! IP: {client_ip}")
-
-    try:
-        async for _ in websocket:
-            pass  # Mantiene la connessione attiva
-    except Exception as e:
-        print(f"⚠️ Errore WebSocket: {e}")
-    finally:
-        connected_clients.remove(websocket)
-        print(f"🔴 Client disconnesso! Totale attivi: {len(connected_clients)}")
-
+# Endpoint di health check per Railway
 async def health_check(request):
     return web.Response(text="OK", status=200)
 
+# Configurazione del server HTTP per l'health check
+app = web.Application()
+app.router.add_get('/health', health_check)
+
 async def start_server():
-    """Avvia il WebSocket server e il sistema di health check per Railway."""
-    server = await websockets.serve(handler, "0.0.0.0", PORT, ping_interval=None, ping_timeout=None)
+    # Creiamo il server WebSocket con il parametro `path` corretto
+    websocket_server = await websockets.serve(handler, "0.0.0.0", PORT, ping_interval=None, ping_timeout=None)
+
     print(f"🚀 WebSocket Server avviato su ws://0.0.0.0:{PORT}")
 
-    # Health Check per Railway
-    app = web.Application()
-    app.router.add_get('/health', health_check)
+    # Avvia il server HTTP per l'health check
     runner = web.AppRunner(app)
     await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 8080)
+    site = web.TCPSite(runner, "0.0.0.0", 8080)  # Porta 8080 per l'health check
     await site.start()
     print("✅ Health check attivo su http://0.0.0.0:8080/health")
 
-    await asyncio.gather(server.wait_closed(), notify_clients())
+    await asyncio.gather(websocket_server.wait_closed(), notify_clients())
 
 if __name__ == "__main__":
     try:
         asyncio.run(start_server())
     except Exception as e:
         print(f"❌ Errore nell'avvio del WebSocket Server: {e}")
+
+
