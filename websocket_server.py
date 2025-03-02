@@ -3,7 +3,7 @@ import json
 import asyncio
 import websockets
 from aiohttp import web
-
+from config import COSTO_CARTELLA
 # Assicura che la cartella "data/" esista
 os.makedirs("data", exist_ok=True)
 
