@@ -62,8 +62,9 @@ async def handler(websocket):
     except Exception as e:
         print(f"❌ Errore generale WebSocket: {e}")
     finally:
-        connected_clients.remove(websocket)
-        print(f"❌ Client disconnesso! Totale attivi: {len(connected_clients)}")
+        if websocket in connected_clients:
+            connected_clients.remove(websocket)
+            print(f"❌ Client disconnesso! Totale attivi: {len(connected_clients)}")
 
 
 
