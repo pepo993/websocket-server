@@ -138,7 +138,7 @@ app.router.add_get('/health', health_check)
 
 async def start_server():
     # Creiamo il server WebSocket con il parametro `path` corretto
-    websocket_server = await websockets.serve(handler, "0.0.0.0", PORT, ping_interval=None, ping_timeout=None)
+    websocket_server = await websockets.serve(handler, "0.0.0.0", PORT, ping_interval=None, ping_timeout=30)
 
     print(f"🚀 WebSocket Server avviato su ws://0.0.0.0:{PORT}")
 
