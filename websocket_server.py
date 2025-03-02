@@ -95,9 +95,13 @@ async def notify_clients():
 
                 # ✅ Controllo duplicati PRIMA di stampare e inviare ai client
                 if stato_attuale == ultimo_stato_trasmesso:
-                    print("⚠️ Stato invariato, evitando di inviare aggiornamenti ripetuti.")
-                    await asyncio.sleep(5)
+                    print(f"⚠️ Stato invariato, evitando duplicati. Ultimo numero estratto: {stato_attuale['numero_estratto']}")
+                    await asyncio.sleep(5)  # ⏳ Aumentiamo il tempo per ridurre il carico
                     continue  
+
+# ✅ Aggiorniamo lo stato trasmesso solo se è cambiato
+ultimo_stato_trasmesso = json.loads(json.dumps(stato_attuale))  # Copia profonda dello stato
+
 
                 # ✅ Aggiorniamo lo stato trasmesso solo se è cambiato
                 ultimo_stato_trasmesso = json.loads(json.dumps(stato_attuale))  # Copia profonda dello stato
