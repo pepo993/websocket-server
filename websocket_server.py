@@ -78,6 +78,9 @@ async def notify_clients():
         if connected_clients:
             try:
                 game_data = load_game_state()
+                # ✅ Usa un buffer per evitare invii multipli simultanei
+                await asyncio.sleep(0.2) 
+                
                 if not game_data or "drawn_numbers" not in game_data:
                     print("❌ Errore: Dati del gioco non validi.")
                     await asyncio.sleep(5)
