@@ -99,13 +99,8 @@ async def notify_clients():
                     await asyncio.sleep(5)  # ⏳ Aumentiamo il tempo per ridurre il carico
                     continue  
 
-# ✅ Aggiorniamo lo stato trasmesso solo se è cambiato
-ultimo_stato_trasmesso = json.loads(json.dumps(stato_attuale))  # Copia profonda dello stato
-
-
                 # ✅ Aggiorniamo lo stato trasmesso solo se è cambiato
-                ultimo_stato_trasmesso = json.loads(json.dumps(stato_attuale))  # Copia profonda dello stato
-                
+                ultimo_stato_trasmesso = json.loads(json.dumps(stato_attuale))  # Copia profonda dello stato                
                 print(f"📤 [DEBUG] Nuovo stato inviato ai client WebSocket: {json.dumps(stato_attuale, indent=2)}")
 
                 # Convertiamo lo stato in JSON
