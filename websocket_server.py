@@ -82,7 +82,8 @@ async def notify_clients():
                     "numeri_estratti": game_data["drawn_numbers"],
                     "game_status": {
                         "cartelle_vendute": sum(len(p) for p in game_data.get("players", {}).values()),
-                        "jackpot": len(game_data.get("players", {})) * 1,
+                        "jackpot": sum(len(p) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA
+
                         "giocatori_attivi": len(game_data.get("players", {})),
                         "vincitori": game_data.get("winners", {})
                     },
