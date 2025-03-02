@@ -63,9 +63,11 @@ async def handler(websocket):
         print(f"❌ Errore generale WebSocket: {e}")
     finally:
         if websocket in connected_clients:
+            print(f"🔍 Client {websocket.remote_address} disconnesso. Rimuovendo dalla lista.")
             connected_clients.remove(websocket)
-            print(f"❌ Client disconnesso! Totale attivi: {len(connected_clients)}")
-
+        else:
+            print(f"⚠️ Tentativo di rimuovere client non presente nella lista: {websocket}")
+        print(f"❌ Client disconnesso! Totale attivi: {len(connected_clients)}")
 
 
 async def notify_clients():
