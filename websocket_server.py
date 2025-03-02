@@ -99,13 +99,12 @@ async def notify_clients():
                 # ✅ Controllo duplicati PRIMA di stampare e inviare ai client
                 if stato_attuale == ultimo_stato_trasmesso:
                     print(f"⚠️ Stato invariato, evitando duplicati. Ultimo numero estratto: {stato_attuale['numero_estratto']}")
-                    await asyncio.sleep(10)  # ⏳ Aumentiamo il tempo per ridurre il carico
+                    await asyncio.sleep(12)  # ⏳ Aumentiamo il tempo per ridurre il carico
                     continue  
 
                 # ✅ Aggiorniamo lo stato trasmesso solo se è cambiato
                 ultimo_stato_trasmesso = json.loads(json.dumps(stato_attuale))  # Copia profonda dello stato                
                 print(f"📤 DEBUG:Stato del gioco inviato: {json.dumps(stato_attuale, indent=None, separators=(', ', ': '))}")
-
 
                 # Convertiamo lo stato in JSON
                 message = json.dumps(stato_attuale)
