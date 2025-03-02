@@ -101,7 +101,8 @@ async def notify_clients():
 
                 # ✅ Aggiorniamo lo stato trasmesso solo se è cambiato
                 ultimo_stato_trasmesso = json.loads(json.dumps(stato_attuale))  # Copia profonda dello stato                
-                print(f"📤DEBUG Stato del gioco inviato: {json.dumps(stato_attuale, indent=None, separators=(', ', ': '))}")
+                print(f"📤 Stato del gioco inviato: {json.dumps(stato_attuale, indent=None, separators=(', ', ': '))}")
+
 
                 # Convertiamo lo stato in JSON
                 message = json.dumps(stato_attuale)
