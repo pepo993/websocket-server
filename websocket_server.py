@@ -66,7 +66,7 @@ async def handler(websocket):
         print(f"❌ Client disconnesso! Totale attivi: {len(connected_clients)}")
 
 async def notify_clients():
-    """ Invia i dati ai client WebSocket ogni 5 secondi """
+    """ Invia i dati ai client WebSocket solo se lo stato è cambiato """
     global ultimo_stato_trasmesso  
     while True:
         if connected_clients:
@@ -76,14 +76,14 @@ async def notify_clients():
                     print("❌ Errore: Dati del gioco non validi.")
                     await asyncio.sleep(5)
                     continue  
-                
+
+                # Costruisce lo stato attuale del gioco
                 stato_attuale = {
                     "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
                     "numeri_estratti": game_data["drawn_numbers"],
                     "game_status": {
                         "cartelle_vendute": sum(len(p) for p in game_data.get("players", {}).values()),
                         "jackpot": sum(len(p) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
-
                         "giocatori_attivi": len(game_data.get("players", {})),
                         "vincitori": game_data.get("winners", {})
                     },
@@ -93,14 +93,18 @@ async def notify_clients():
                     }
                 }
 
-                print(f"📤 Dati inviati ai client WebSocket: {json.dumps(stato_attuale, indent=2)}")
-
-                # Se lo stato è invariato, non inviare aggiornamenti
+                # ✅ Controllo duplicati PRIMA di stampare e inviare ai client
                 if stato_attuale == ultimo_stato_trasmesso:
+                    print("⚠️ Stato invariato, evitando di inviare aggiornamenti ripetuti.")
                     await asyncio.sleep(5)
                     continue  
 
-                ultimo_stato_trasmesso = stato_attuale
+                # ✅ Aggiorniamo lo stato trasmesso solo se è cambiato
+                ultimo_stato_trasmesso = json.loads(json.dumps(stato_attuale))  # Copia profonda dello stato
+                
+                print(f"📤 [DEBUG] Nuovo stato inviato ai client WebSocket: {json.dumps(stato_attuale, indent=2)}")
+
+                # Convertiamo lo stato in JSON
                 message = json.dumps(stato_attuale)
 
                 disconnected_clients = set()
@@ -114,13 +118,15 @@ async def notify_clients():
                         print(f"❌ Errore generico durante l'invio: {e}")
                         disconnected_clients.add(client)
                         
+                # Rimuove i client disconnessi
                 for client in disconnected_clients:
                     connected_clients.remove(client)
 
             except Exception as e:
                 print(f"❌ Errore generale in notify_clients: {e}")
 
-        await asyncio.sleep(2)
+        await asyncio.sleep(2)  # Manteniamo l'intervallo a 2 secondi per reattività
+
 
 # Endpoint di health check per Railway
 async def health_check(request):
