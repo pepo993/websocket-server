@@ -80,7 +80,7 @@ async def notify_clients():
         if connected_clients:
             try:
                 game_data = load_game_state()
-                await asyncio.sleep(0.2)  # Evita spam di aggiornamenti
+                await asyncio.sleep(0.3)  # Evita spam di aggiornamenti
 
                 if not game_data or "drawn_numbers" not in game_data:
                     print("❌ Dati di gioco non validi.")
@@ -107,7 +107,7 @@ async def notify_clients():
                 print(f"📤 Dati inviati ai client WebSocket: {json.dumps(stato_attuale, indent=None, separators=(', ', ': '))}")
                 # 📌 Evita di inviare aggiornamenti duplicati
                 if stato_attuale == ultimo_stato_trasmesso:
-                    await asyncio.sleep(3)
+                    await asyncio.sleep(5)
                     continue  
                     
                 # ✅ Aggiorniamo lo stato trasmesso solo se è cambiato
