@@ -94,8 +94,9 @@ async def notify_clients():
                     next_game_time = int((time.time() + 120) * 1000)  # 2 minuti dopo l'attuale
 
 
-                # 🎲 Recupera o genera un ID partita
-                game_id = game_data.get("game_id", str(int(asyncio.get_event_loop().time())))
+                # 🎲 Recupera  ID partita da game logic
+                game_id = game_data.get("game_id")  # Usa l'ID salvato da start_game()
+
 
                 # ✅ Salva il nuovo stato con next_game_time e game_id
                 game_data["next_game_time"] = next_game_time
