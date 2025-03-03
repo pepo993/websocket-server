@@ -94,15 +94,6 @@ async def notify_clients():
                     next_game_time = int((time.time() + 120) * 1000)  # 2 minuti dopo l'attuale
 
 
-                # 🎲 Recupera  ID partita da game logic
-                game_id = game_data.get("game_id")  # Usa l'ID salvato da start_game()
-
-
-                # ✅ Salva il nuovo stato con next_game_time e game_id
-                game_data["next_game_time"] = next_game_time
-                game_data["game_id"] = game_id
-                save_game_state(game_data)
-
                 # Costruisce lo stato attuale del gioco
                 stato_attuale = {
                     "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
@@ -113,7 +104,6 @@ async def notify_clients():
                         "giocatori_attivi": len(game_data.get("players", {})),
                         "vincitori": game_data.get("winners", {}),
                         "next_game_time": next_game_time,  # ⏳ Aggiunto countdown della prossima partita
-                        "game_id": game_id  # 🎲 Aggiunto ID partita
                     },
                     "players": {
                         user_id: {"cartelle": game_data["players"][user_id]}
@@ -124,7 +114,7 @@ async def notify_clients():
                 print(f"📤 Dati inviati ai client WebSocket: {json.dumps(stato_attuale, indent=None, separators=(', ', ': '))}")
                 # 📌 Evita di inviare aggiornamenti duplicati
                 if stato_attuale == ultimo_stato_trasmesso:
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(3)
                     continue  
                     
                 # ✅ Aggiorniamo lo stato trasmesso solo se è cambiato
