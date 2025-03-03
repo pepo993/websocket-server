@@ -65,7 +65,7 @@ async def handler(websocket):
     finally:
         if websocket in connected_clients:
             print(f"🔍 Client {websocket.remote_address} disconnesso. Rimuovendo dalla lista.")
-            connected_clients.remove(websocket)
+            connected_clients.discard(websocket) #invece di remove 
         else:
             print(f"⚠️ Tentativo di rimuovere client non presente nella lista: {websocket}")
         print(f"❌ Client disconnesso! Totale attivi: {len(connected_clients)}")
@@ -105,7 +105,7 @@ async def notify_clients():
                 # ✅ Controllo duplicati PRIMA di stampare e inviare ai client
                 if stato_attuale == ultimo_stato_trasmesso:
                     print(f"⚠️ Stato invariato, evitando duplicati. Ultimo numero estratto: {stato_attuale['numero_estratto']}")
-                    await asyncio.sleep(12)  # ⏳ Aumentiamo il tempo per ridurre il carico
+                    await asyncio.sleep(5)  # ⏳
                     continue  
 
                 # ✅ Aggiorniamo lo stato trasmesso solo se è cambiato
