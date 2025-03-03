@@ -35,7 +35,7 @@ async def handler(websocket):
     """ Gestisce le connessioni WebSocket """
     connected_clients.add(websocket)
     print(f"✅ Nuovo client connesso! Totale: {len(connected_clients)}")
-
+    print(f"✅ Nuovo client connesso: {websocket.remote_address}")  # Stampa IP e porta del client
     try:
         async for message in websocket:
             print(f"📥 Messaggio ricevuto: {message}")
@@ -44,7 +44,7 @@ async def handler(websocket):
                 game_state = json.loads(message)
                 if "drawn_numbers" in game_state:
                     save_game_state(game_state)  # ✅ Salva lo stato aggiornato
-                    print("📌 Stato del gioco aggiornato.")
+                    print("📌 Stato del gioco aggiornato con nuovi numeri estratti.")
                     
                     # 📢 Invia l'aggiornamento a tutti i client connessi
                     broadcast_message = json.dumps(game_state)
@@ -106,17 +106,19 @@ async def notify_clients():
                 # 📌 Evita di inviare aggiornamenti duplicati
                 if stato_attuale == ultimo_stato_trasmesso:
                     print(f"⚠️ Stato invariato, evitando duplicati.")
-                    await asyncio.sleep(3)
+                    await asyncio.sleep(5)
                     continue  
-
+                    
+                # ✅ Aggiorniamo lo stato trasmesso solo se è cambiato
                 ultimo_stato_trasmesso = json.loads(json.dumps(stato_attuale))  # Deep copy
-                message = json.dumps(stato_attuale)
+                message = json.dumps(stato_attuale) # Convertiamo lo stato in JSON
 
                 disconnected_clients = set()
                 for client in connected_clients:
                     try:
                         await client.send(message)
                     except websockets.exceptions.ConnectionClosed:
+                        print(f"❌ Errore WebSocket durante l'invio: {e}")
                         disconnected_clients.add(client)
 
                 # 📌 Rimuove i client disconnessi
