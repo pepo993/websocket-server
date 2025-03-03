@@ -90,7 +90,7 @@ async def notify_clients():
                 # 🕐 Imposta il tempo della prossima partita (5 minuti dopo la fine)
                 next_game_time = game_data.get("next_game_time", None)
                 if not next_game_time:
-                    next_game_time = int((asyncio.get_event_loop().time() + 300) * 1000)  # 5 minuti dopo
+                    next_game_time = int((asyncio.get_event_loop().time() + 120) * 1000)  # 2 minuti dopo
 
                 # 🎲 Recupera o genera un ID partita
                 game_id = game_data.get("game_id", str(int(asyncio.get_event_loop().time())))
