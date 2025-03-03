@@ -25,4 +25,4 @@ JACKPOT_CINQUINA = 0.10  # Percentuale destinata al vincitore della Cinquina (10
 MAX_CARTELLE_PER_UTENTE = 24
 
 # Timeout massimo per una partita
-TIMEOUT_PARTITA = 300  # Tempo massimo per completare la partita (secondi)
+TIMEOUT_PARTITA = 600  # Tempo massimo per completare la partita (secondi)
