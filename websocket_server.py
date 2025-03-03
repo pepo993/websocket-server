@@ -126,8 +126,7 @@ async def notify_clients():
                     
                 # ✅ Aggiorniamo lo stato trasmesso solo se è cambiato
                 ultimo_stato_trasmesso = json.loads(json.dumps(stato_attuale))  # Deep copy
-                print(f"📤 DEBUG:Stato del gioco inviato: {json.dumps(stato_attuale, indent=None, separators=(', ', ': '))}")
-
+                #print(f"📤 DEBUG:Stato del gioco inviato: {json.dumps(stato_attuale, indent=None, separators=(', ', ': '))}")
                 message = json.dumps(stato_attuale) # Convertiamo lo stato in JSON
 
                 disconnected_clients = set()
