@@ -87,13 +87,6 @@ async def notify_clients():
                     await asyncio.sleep(3)
                     continue  
 
-                # 🕐 Imposta il tempo della prossima partita (5 minuti dopo la fine)
-                import time
-                next_game_time = game_data.get("next_game_time", None)
-                if not next_game_time or next_game_time < int(time.time() * 1000):
-                    next_game_time = int((time.time() + 120) * 1000)  # 2 minuti dopo l'attuale
-
-
                 # Costruisce lo stato attuale del gioco
                 stato_attuale = {
                     "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
@@ -103,7 +96,7 @@ async def notify_clients():
                         "jackpot": sum(len(p) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
                         "giocatori_attivi": len(game_data.get("players", {})),
                         "vincitori": game_data.get("winners", {}),
-                        "next_game_time": next_game_time,  # ⏳ Aggiunto countdown della prossima partita
+
                     },
                     "players": {
                         user_id: {"cartelle": game_data["players"][user_id]}
