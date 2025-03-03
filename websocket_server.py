@@ -80,7 +80,7 @@ async def notify_clients():
         if connected_clients:
             try:
                 game_data = load_game_state()
-                await asyncio.sleep(0.3)  # Evita spam di aggiornamenti
+                await asyncio.sleep(0.2)  # Evita spam di aggiornamenti
 
                 if not game_data or "drawn_numbers" not in game_data:
                     print("❌ Dati di gioco non validi.")
