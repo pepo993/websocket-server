@@ -72,43 +72,19 @@ async def handler(websocket):
 
 
 async def notify_clients():
-    """ Invia dati solo se cambia il numero estratto. """
-    global ultimo_stato_trasmesso
+    """ Invia i dati ai client WebSocket solo se lo stato è cambiato """
+    global ultimo_stato_trasmesso  
     while True:
         if connected_clients:
             try:
                 game_data = load_game_state()
-                if not game_data or "drawn_numbers" not in game_data:
-                    await asyncio.sleep(2)
-                    continue  
-
-                numero_estratto = game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None
+                # ✅ Usa un buffer per evitare invii multipli simultanei
+                await asyncio.sleep(0.2) 
                 
-                # ✅ Evita di inviare se il numero estratto è lo stesso di prima
-                if numero_estratto == ultimo_stato_trasmesso:
-                    await asyncio.sleep(2)
+                if not game_data or "drawn_numbers" not in game_data:
+                    print("❌ Errore: Dati del gioco non validi.")
+                    await asyncio.sleep(3)
                     continue  
-
-                ultimo_stato_trasmesso = numero_estratto
-                message = json.dumps({"numero_estratto": numero_estratto})
-
-                disconnected_clients = set()
-                for client in connected_clients:
-                    try:
-                        await client.send(message)
-                    except websockets.exceptions.ConnectionClosedError:
-                        disconnected_clients.add(client)
-                    except Exception:
-                        disconnected_clients.add(client)
-                        
-                for client in disconnected_clients:
-                    connected_clients.remove(client)
-
-            except Exception as e:
-                print(f"❌ Errore in notify_clients: {e}")
-
-        await asyncio.sleep(2)  # Mantiene aggiornamenti ogni 2 secondi
-
 
                 # Costruisce lo stato attuale del gioco
                 stato_attuale = {
@@ -188,5 +164,4 @@ if __name__ == "__main__":
         asyncio.run(start_server())
     except Exception as e:
         print(f"❌ Errore nell'avvio del WebSocket Server: {e}")
-
 
