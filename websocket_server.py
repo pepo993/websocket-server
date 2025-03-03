@@ -118,6 +118,7 @@ async def notify_clients():
                     }
                 }
 
+                print(f"📤 Dati inviati ai client WebSocket: {json.dumps(stato_attuale, indent=2)}")
                 # 📌 Evita di inviare aggiornamenti duplicati
                 if stato_attuale == ultimo_stato_trasmesso:
                     await asyncio.sleep(5)
