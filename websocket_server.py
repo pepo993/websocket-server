@@ -72,14 +72,17 @@ async def handler(websocket):
             print(f"❌ Client rimosso dalla lista. Totale attivi: {len(connected_clients)}")
 
 # 📌 Funzione per notificare i client attivi
+import time
+
 async def notify_clients():
-    """ Invia aggiornamenti solo se lo stato è cambiato """
+    """ Invia aggiornamenti ai client solo se lo stato è cambiato """
     global ultimo_stato_trasmesso
 
     while True:
         if connected_clients:
             try:
                 game_data = load_game_state()
+
                 await asyncio.sleep(0.2)  # Evita spam di aggiornamenti
 
                 if not game_data or "drawn_numbers" not in game_data:
@@ -87,22 +90,16 @@ async def notify_clients():
                     await asyncio.sleep(3)
                     continue  
 
+                # 🎲 Recupera o genera un ID partita **solo se non esiste già**
+                if "game_id" not in game_data:
+                    game_data["game_id"] = str(int(time.time() * 1000))  # Usa timestamp solo alla creazione
+
                 # 🕐 Imposta il tempo della prossima partita (5 minuti dopo la fine)
-                import time
-                next_game_time = game_data.get("next_game_time", None)
-                if not next_game_time or next_game_time < int(time.time() * 1000):
-                    next_game_time = int((time.time() + 120) * 1000)  # 2 minuti dopo l'attuale
+                if "next_game_time" not in game_data or game_data["next_game_time"] < int(time.time() * 1000):
+                    game_data["next_game_time"] = int((time.time() + 120) * 1000)  # 2 minuti dopo
 
-
-                # 🎲 Recupera o genera un ID partita
-                game_id = game_data.get("game_id", str(int(asyncio.get_event_loop().time())))
-
-                # ✅ Salva il nuovo stato con next_game_time e game_id
-                game_data["next_game_time"] = next_game_time
-                game_data["game_id"] = game_id
-                save_game_state(game_data)
-
-                # Costruisce lo stato attuale del gioco
+                save_game_state(game_data)  # Salviamo lo stato con game_id fisso
+                
                 stato_attuale = {
                     "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
                     "numeri_estratti": game_data["drawn_numbers"],
@@ -111,8 +108,8 @@ async def notify_clients():
                         "jackpot": sum(len(p) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
                         "giocatori_attivi": len(game_data.get("players", {})),
                         "vincitori": game_data.get("winners", {}),
-                        "next_game_time": next_game_time,  # ⏳ Aggiunto countdown della prossima partita
-                        "game_id": game_id  # 🎲 Aggiunto ID partita
+                        "next_game_time": game_data["next_game_time"],  # ⏳ Countdown partita
+                        "game_id": game_data["game_id"]  # 🎲 ID partita fisso
                     },
                     "players": {
                         user_id: {"cartelle": game_data["players"][user_id]}
