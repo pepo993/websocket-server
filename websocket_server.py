@@ -81,11 +81,24 @@ async def notify_clients():
             try:
                 game_data = load_game_state()
                 await asyncio.sleep(0.2)  # Evita spam di aggiornamenti
-                
+
                 if not game_data or "drawn_numbers" not in game_data:
                     print("❌ Dati di gioco non validi.")
                     await asyncio.sleep(3)
                     continue  
+
+                # 🕐 Imposta il tempo della prossima partita (5 minuti dopo la fine)
+                next_game_time = game_data.get("next_game_time", None)
+                if not next_game_time:
+                    next_game_time = int((asyncio.get_event_loop().time() + 300) * 1000)  # 5 minuti dopo
+
+                # 🎲 Recupera o genera un ID partita
+                game_id = game_data.get("game_id", str(int(asyncio.get_event_loop().time())))
+
+                # ✅ Salva il nuovo stato con next_game_time e game_id
+                game_data["next_game_time"] = next_game_time
+                game_data["game_id"] = game_id
+                save_game_state(game_data)
 
                 # Costruisce lo stato attuale del gioco
                 stato_attuale = {
@@ -95,7 +108,9 @@ async def notify_clients():
                         "cartelle_vendute": sum(len(p) for p in game_data.get("players", {}).values()),
                         "jackpot": sum(len(p) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
                         "giocatori_attivi": len(game_data.get("players", {})),
-                        "vincitori": game_data.get("winners", {})
+                        "vincitori": game_data.get("winners", {}),
+                        "next_game_time": next_game_time,  # ⏳ Aggiunto countdown della prossima partita
+                        "game_id": game_id  # 🎲 Aggiunto ID partita
                     },
                     "players": {
                         user_id: {"cartelle": game_data["players"][user_id]}
@@ -105,7 +120,6 @@ async def notify_clients():
 
                 # 📌 Evita di inviare aggiornamenti duplicati
                 if stato_attuale == ultimo_stato_trasmesso:
-                    print(f"⚠️ Stato invariato, evitando duplicati.")
                     await asyncio.sleep(5)
                     continue  
                     
