@@ -83,7 +83,7 @@ async def notify_clients():
                 
                 if not game_data or "drawn_numbers" not in game_data:
                     print("❌ Errore: Dati del gioco non validi.")
-                    await asyncio.sleep(5)
+                    await asyncio.sleep(3)
                     continue  
 
                 # Costruisce lo stato attuale del gioco
@@ -105,7 +105,7 @@ async def notify_clients():
                 # ✅ Controllo duplicati PRIMA di stampare e inviare ai client
                 if stato_attuale == ultimo_stato_trasmesso:
                     print(f"⚠️ Stato invariato, evitando duplicati. Ultimo numero estratto: {stato_attuale['numero_estratto']}")
-                    await asyncio.sleep(5)  # ⏳
+                    await asyncio.sleep(3)  # ⏳
                     continue  
 
                 # ✅ Aggiorniamo lo stato trasmesso solo se è cambiato
