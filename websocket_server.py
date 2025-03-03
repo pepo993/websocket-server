@@ -92,7 +92,8 @@ async def notify_clients():
 
                 # 🎲 Recupera o genera un ID partita **solo se non esiste già**
                 if "game_id" not in game_data:
-                    game_data["game_id"] = str(random.randint(1000, 9999))  # Usa un ID casuale di 4 cifre
+                    game_data["game_id"] = str(int(time.time() * 1000))  # Usa timestamp solo alla creazione
+
 
 
                 # 🕐 Imposta il tempo della prossima partita (2 minuti dopo la fine)
