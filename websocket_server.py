@@ -35,6 +35,7 @@ async def handler(websocket):
     """ Gestisce le connessioni WebSocket dei client """
     connected_clients.add(websocket)
     print(f"✅ Nuovo client connesso! Totale: {len(connected_clients)}")
+    print(f"✅ Nuovo client connesso: {websocket.remote_address}")  # Stampa IP e porta del client
 
     try:
         async for message in websocket:
