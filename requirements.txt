@@ -5,3 +5,4 @@ logging
 python-dotenv
 flask
 gunicorn
+sqlalchemy
