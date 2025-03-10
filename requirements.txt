@@ -7,4 +7,3 @@ flask
 gunicorn
 sqlalchemy
 asyncpg
-startswith
