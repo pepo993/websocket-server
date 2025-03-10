@@ -11,7 +11,6 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://postgres:password
 # Token del bot Telegram
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 
-
 # URL della Web App Telegram
 WEBAPP_URL = "https://telegram-bingo-bot.vercel.app"
 
