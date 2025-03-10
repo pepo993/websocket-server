@@ -163,6 +163,7 @@ async def notify_clients():
 
         await asyncio.sleep(2)  # Mantiene un intervallo di aggiornamento di 2s
 
+
 # 📌 Health Check per Railway
 async def health_check(request):
     return web.Response(text="OK", status=200)
@@ -175,14 +176,14 @@ app.router.add_get('/health', health_check)
 async def start_server():
     websocket_server = await websockets.serve(handler, "0.0.0.0", PORT, ping_interval=None, ping_timeout=None)
 
-    logging.info(f"🚀 WebSocket Server avviato su ws://0.0.0.0:{PORT}")
+    print(f"🚀 WebSocket Server avviato su ws://0.0.0.0:{PORT}")
 
     # Avvia il server HTTP per l'health check
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", 8080)
     await site.start()
-    logging.info("✅ Health check attivo su http://0.0.0.0:8080/health")
+    print("✅ Health check attivo su http://0.0.0.0:8080/health")
 
     await asyncio.gather(websocket_server.wait_closed(), notify_clients())
 
@@ -191,4 +192,5 @@ if __name__ == "__main__":
     try:
         asyncio.run(start_server())
     except Exception as e:
-        logging.error(f"❌ Errore nell'avvio del WebSocket Server: {e}")
+        print(f"❌ Errore nell'avvio del WebSocket Server: {e}")
+
