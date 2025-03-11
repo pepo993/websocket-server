@@ -65,7 +65,7 @@ class Transaction(Base):
     __tablename__ = "transactions"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # ✅ Cambiato a Integer
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # ✅ Ora è Integer
     transaction_type = Column(String, nullable=False)  # deposit, withdraw, win
     amount = Column(Float, nullable=False)
     timestamp = Column(DateTime, default=func.now())
