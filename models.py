@@ -57,6 +57,7 @@ class Ticket(Base):
     game = relationship("Game", back_populates="tickets")
     user = relationship("User", back_populates="tickets")
 
+
     def __repr__(self):
         return f"<Ticket(id={self.id}, game_id={self.game_id}, user_id={self.user_id})>"
 
@@ -75,3 +76,4 @@ class Transaction(Base):
 
     def __repr__(self):
         return f"<Transaction(id={self.id}, user_id={self.user_id}, amount={self.amount}, type={self.transaction_type})>"
+
