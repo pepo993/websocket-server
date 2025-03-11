@@ -22,34 +22,54 @@ ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 async def load_game_state():
     async with SessionLocal() as db:
         try:
+            logging.info("🔍 Caricamento stato del gioco dal database...")
+
             result = await db.execute(select(Game).filter(Game.active == True))
             game = result.scalars().first()
-            
+
             if not game:
                 logging.warning("⚠️ Nessuna partita attiva trovata nel database.")
                 return {"drawn_numbers": [], "players": {}, "winners": {}}
 
+            logging.info(f"✅ Partita attiva trovata: {game.game_id}, Jackpot: {game.jackpot}")
+
             # Recupera i numeri estratti
-            drawn_numbers = list(map(int, game.drawn_numbers.split(","))) if game.drawn_numbers else []
+            if game.drawn_numbers:
+                drawn_numbers = list(map(int, game.drawn_numbers.split(",")))
+            else:
+                drawn_numbers = []
+            logging.info(f"🔢 Numeri estratti: {drawn_numbers}")
 
             # Recupera i giocatori e le cartelle
             result = await db.execute(select(Ticket).filter(Ticket.game_id == game.game_id))
             tickets = result.scalars().all()
 
+            logging.info(f"🎟️ Numero di cartelle trovate: {len(tickets)}")
+
             players = {}
             for ticket in tickets:
                 if ticket.user_id not in players:
                     players[ticket.user_id] = {"cartelle": []}
-                players[ticket.user_id]["cartelle"].append(list(map(int, ticket.numbers.split(","))))
+                
+                # 👀 DEBUG: Controlliamo il formato dei numeri della cartella
+                try:
+                    ticket_numbers = list(map(int, ticket.numbers.split(",")))
+                except Exception as e:
+                    logging.error(f"❌ Errore nel parsing dei numeri della cartella: {ticket.numbers} - Errore: {e}")
+                    continue  # Saltiamo la cartella problematica
 
-            logging.info(f"✅ Stato del gioco caricato con {len(drawn_numbers)} numeri estratti e {len(players)} giocatori.")
+                players[ticket.user_id]["cartelle"].append(ticket_numbers)
+
+            logging.info(f"👥 Giocatori trovati: {len(players)}")
+
             return {
                 "drawn_numbers": drawn_numbers,
                 "players": players,
                 "winners": {}  # I vincitori saranno aggiornati separatamente
             }
+
         except Exception as e:
-            logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}", exc_info=True)  # Mostra l'errore completo
+            logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}", exc_info=True)  # Stampa stack trace completo
             return {"drawn_numbers": [], "players": {}, "winners": {}}
 
 
