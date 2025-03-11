@@ -31,45 +31,39 @@ def save_game_state(state):
         json.dump(state, f, indent=4)
 
 # 📌 Gestione delle connessioni WebSocket
-async def handler(websocket):
+async def handler(websocket, path):
     """ Gestisce le connessioni WebSocket """
     connected_clients.add(websocket)
-    print(f"✅ Nuovo client connesso! Totale: {len(connected_clients)}")
-    print(f"✅ Nuovo client connesso: {websocket.remote_address}")  # Stampa IP e porta del client
+    print(f"✅ Nuovo client connesso! Totale: {len(connected_clients)} - {websocket.remote_address}")
+
     try:
         async for message in websocket:
             print(f"📥 Messaggio ricevuto: {message}")
-            
+
             try:
                 game_state = json.loads(message)
                 if "drawn_numbers" in game_state:
-                    save_game_state(game_state)  # ✅ Salva lo stato aggiornato
+                    save_game_state(game_state)
                     print("📌 Stato del gioco aggiornato con nuovi numeri estratti.")
-                    
+
                     # 📢 Invia l'aggiornamento a tutti i client connessi
                     broadcast_message = json.dumps(game_state)
-                    disconnected_clients = set()
-
-                    for client in connected_clients:
+                    for client in list(connected_clients):  # Itera su una copia per evitare problemi di rimozione
                         try:
                             await client.send(broadcast_message)
                         except websockets.exceptions.ConnectionClosed:
-                            disconnected_clients.add(client)
-
-                    # Rimuove i client disconnessi
-                    for client in disconnected_clients:
-                        connected_clients.discard(client)
-                        print(f"❌ Client disconnesso rimosso. Totale attivi: {len(connected_clients)}")
+                            connected_clients.discard(client)
+                            print(f"❌ Client disconnesso rimosso. Totale attivi: {len(connected_clients)}")
 
             except json.JSONDecodeError:
                 print("❌ Errore: Messaggio non è un JSON valido.")
 
-    except websockets.exceptions.ConnectionClosed:
-        print("⚠️ Client disconnesso normalmente.")
+    except websockets.exceptions.ConnectionClosed as e:
+        print(f"⚠️ Client disconnesso normalmente: {e}")
+
     finally:
-        if websocket in connected_clients:
-            connected_clients.discard(websocket)
-            print(f"❌ Client rimosso dalla lista. Totale attivi: {len(connected_clients)}")
+        connected_clients.discard(websocket)
+        print(f"❌ Client rimosso dalla lista. Totale attivi: {len(connected_clients)}")
 
 # 📌 Funzione per notificare i client attivi
 async def notify_clients():
@@ -80,21 +74,17 @@ async def notify_clients():
         if connected_clients:
             try:
                 game_data = load_game_state()
-                await asyncio.sleep(0.2)  # Evita spam di aggiornamenti
 
                 if not game_data or "drawn_numbers" not in game_data:
                     print("❌ Dati di gioco non validi.")
                     await asyncio.sleep(3)
                     continue  
 
-                # 🕐 Imposta il tempo della prossima partita (5 minuti dopo la fine)
+                # ⏳ Imposta il tempo della prossima partita se non esiste
                 import time
-                next_game_time = game_data.get("next_game_time", None)
-                if not next_game_time or next_game_time < int(time.time() * 1000):
-                    next_game_time = int((time.time() + 120) * 1000)  # 2 minuti dopo l'attuale
+                next_game_time = game_data.get("next_game_time", int((time.time() + 120) * 1000))
 
-
-                # Costruisce lo stato attuale del gioco
+                # 📌 Costruisce lo stato attuale del gioco
                 stato_attuale = {
                     "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
                     "numeri_estratti": game_data["drawn_numbers"],
@@ -103,7 +93,7 @@ async def notify_clients():
                         "jackpot": sum(len(p) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
                         "giocatori_attivi": len(game_data.get("players", {})),
                         "vincitori": game_data.get("winners", {}),
-                        "next_game_time": next_game_time,  # ⏳ Aggiunto countdown della prossima partita
+                        "next_game_time": next_game_time,
                     },
                     "players": {
                         user_id: {"cartelle": game_data["players"][user_id]}
@@ -111,29 +101,19 @@ async def notify_clients():
                     }
                 }
 
-                print(f"📤 Dati inviati ai client WebSocket: {json.dumps(stato_attuale, indent=None, separators=(', ', ': '))}")
-                # 📌 Evita di inviare aggiornamenti duplicati
-                if stato_attuale == ultimo_stato_trasmesso:
-                    await asyncio.sleep(3)
-                    continue  
-                    
-                # ✅ Aggiorniamo lo stato trasmesso solo se è cambiato
-                ultimo_stato_trasmesso = json.loads(json.dumps(stato_attuale))  # Deep copy
-                #print(f"📤 DEBUG:Stato del gioco inviato: {json.dumps(stato_attuale, indent=None, separators=(', ', ': '))}")
-                message = json.dumps(stato_attuale) # Convertiamo lo stato in JSON
+                # 📤 Invia solo se lo stato è cambiato
+                if stato_attuale != ultimo_stato_trasmesso:
+                    ultimo_stato_trasmesso = stato_attuale  # Aggiorna lo stato memorizzato
+                    message = json.dumps(stato_attuale)
 
-                disconnected_clients = set()
-                for client in connected_clients:
-                    try:
-                        await client.send(message)
-                    except websockets.exceptions.ConnectionClosed:
-                        print(f"❌ Errore WebSocket durante l'invio: {e}")
-                        disconnected_clients.add(client)
+                    for client in list(connected_clients):  # Itera su una copia per sicurezza
+                        try:
+                            await client.send(message)
+                        except websockets.exceptions.ConnectionClosed:
+                            connected_clients.discard(client)
+                            print(f"❌ Client disconnesso rimosso. Totale attivi: {len(connected_clients)}")
 
-                # 📌 Rimuove i client disconnessi
-                for client in disconnected_clients:
-                    connected_clients.discard(client)
-                    print(f"❌ Client disconnesso rimosso. Totale attivi: {len(connected_clients)}")
+                    print(f"📤 Dati inviati ai client WebSocket: {message}")
 
             except Exception as e:
                 print(f"❌ Errore in notify_clients: {e}")
@@ -150,18 +130,17 @@ app.router.add_get('/health', health_check)
 
 # 📌 Avvio del WebSocket Server
 async def start_server():
-    websocket_server = await websockets.serve(handler, "0.0.0.0", PORT, ping_interval=None, ping_timeout=None)
+    async with websockets.serve(handler, "0.0.0.0", PORT, ping_interval=None, ping_timeout=None) as websocket_server:
+        print(f"🚀 WebSocket Server avviato su ws://0.0.0.0:{PORT}")
 
-    print(f"🚀 WebSocket Server avviato su ws://0.0.0.0:{PORT}")
+        # Avvia il server HTTP per l'health check
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", 8080)
+        await site.start()
+        print("✅ Health check attivo su http://0.0.0.0:8080/health")
 
-    # Avvia il server HTTP per l'health check
-    runner = web.AppRunner(app)
-    await runner.setup()
-    site = web.TCPSite(runner, "0.0.0.0", 8080)
-    await site.start()
-    print("✅ Health check attivo su http://0.0.0.0:8080/health")
-
-    await asyncio.gather(websocket_server.wait_closed(), notify_clients())
+        await asyncio.gather(websocket_server.wait_closed(), notify_clients())
 
 # 📌 Avvio del server
 if __name__ == "__main__":
@@ -169,3 +148,4 @@ if __name__ == "__main__":
         asyncio.run(start_server())
     except Exception as e:
         print(f"❌ Errore nell'avvio del WebSocket Server: {e}")
+
