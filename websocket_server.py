@@ -11,6 +11,7 @@ from database import SessionLocal
 from models import Game, Ticket
 from config import COSTO_CARTELLA
 import traceback  # 🔥 Per log più dettagliati
+import config
 
 
 # 📌 Imposta il logging dettagliato
