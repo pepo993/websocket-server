@@ -96,18 +96,59 @@ async def handler(websocket):
 
 # 📌 Funzione per notificare i client attivi
 async def notify_clients():
-    """ Invia aggiornamenti solo se lo stato è cambiato """
     global ultimo_stato_trasmesso
 
     while True:
         if connected_clients:
             try:
-                game_data = load_game_state()
+                game_data = await load_game_state()
+                await asyncio.sleep(1.5)  # Evita di inviare troppi aggiornamenti
 
                 if not game_data or "drawn_numbers" not in game_data:
-                    print("❌ Dati di gioco non validi.")
+                    logging.error("❌ Dati di gioco non validi.")
                     await asyncio.sleep(3)
                     continue  
+
+                # Costruisce lo stato attuale del gioco
+                stato_attuale = {
+                    "numero_estratto": game_data["drawn_numbers"][-1] if game_data.get("drawn_numbers") else 0,
+                    "numeri_estratti": game_data.get("drawn_numbers", []),
+                    "game_status": {
+                        "cartelle_vendute": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()),
+                        "jackpot": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()) * 0.2, # Costo cartella 0.2 TON
+                        "giocatori_attivi": len(game_data.get("players", {})),
+                        "winners": game_data.get("winners", {}),
+                    },
+                    "players": game_data.get("players", {})
+                }
+
+                # Evita di inviare aggiornamenti duplicati
+                if stato_attuale == ultimo_stato_trasmesso:
+                    await asyncio.sleep(3)
+                    continue  
+                    
+                # Aggiorniamo lo stato trasmesso solo se è cambiato
+                ultimo_stato_trasmesso = json.loads(json.dumps(stato_attuale))  # Deep copy
+                message = json.dumps(stato_attuale)
+
+                disconnected_clients = set()
+                for client in connected_clients:
+                    try:
+                        await client.send(message)
+                    except websockets.exceptions.ConnectionClosed:
+                        logging.warning("⚠️ Errore WebSocket durante l'invio.")
+                        disconnected_clients.add(client)
+
+                # Rimuove i client disconnessi
+                for client in disconnected_clients:
+                    connected_clients.discard(client)
+                    logging.info(f"❌ Client disconnesso rimosso. Totale attivi: {len(connected_clients)}")
+
+            except Exception as e:
+                logging.error(f"❌ Errore in notify_clients: {e}")
+
+        await asyncio.sleep(2)  # Mantiene un intervallo di aggiornamento di 2s
+
 
                 # ⏳ Imposta il tempo della prossima partita se non esiste
                 import time
