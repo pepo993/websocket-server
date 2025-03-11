@@ -5,30 +5,44 @@ import websockets
 from aiohttp import web
 from config import COSTO_CARTELLA
 
-# Assicura che la cartella "data/" esista
-os.makedirs("data", exist_ok=True)
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+from database import SessionLocal
+from models import Game, Ticket
 
-# Percorso del file di stato
-game_data_path = os.path.join("data", "game_data.json")
+# 📌 Funzione per caricare lo stato del gioco dal database
+async def load_game_state():
+    async with SessionLocal() as db:
+        try:
+            result = await db.execute(select(Game).filter(Game.active == True))
+            game = result.scalars().first()
+            
+            if not game:
+                logging.warning("⚠️ Nessuna partita attiva trovata nel database.")
+                return {"drawn_numbers": [], "players": {}, "winners": {}}
 
-# Porta assegnata per Railway
-PORT = int(os.getenv("PORT", 8002))
+            # Recupera i numeri estratti
+            drawn_numbers = list(map(int, game.drawn_numbers.split(","))) if game.drawn_numbers else []
 
-# Set di client connessi
-connected_clients = set()
-ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
+            # Recupera i giocatori e le cartelle
+            result = await db.execute(select(Ticket).filter(Ticket.game_id == game.game_id))
+            tickets = result.scalars().all()
 
-# 📌 Funzione per caricare lo stato del gioco
-def load_game_state():
-    if os.path.exists(game_data_path):
-        with open(game_data_path, "r") as f:
-            return json.load(f)
-    return {"drawn_numbers": [], "players": {}, "winners": {}}
+            players = {}
+            for ticket in tickets:
+                if ticket.user_id not in players:
+                    players[ticket.user_id] = {"cartelle": []}
+                players[ticket.user_id]["cartelle"].append(list(map(int, ticket.numbers.split(","))))
 
-# 📌 Funzione per salvare lo stato di gioco
-def save_game_state(state):
-    with open(game_data_path, "w") as f:
-        json.dump(state, f, indent=4)
+            return {
+                "drawn_numbers": drawn_numbers,
+                "players": players,
+                "winners": {}  # I vincitori saranno aggiornati separatamente
+            }
+        except Exception as e:
+            logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
+            return {"drawn_numbers": [], "players": {}, "winners": {}}
+
 
 # 📌 Gestione delle connessioni WebSocket
 async def handler(websocket):
