@@ -49,7 +49,7 @@ class Ticket(Base):
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     game_id = Column(String, ForeignKey("games.id", ondelete="CASCADE"), nullable=False)  # ✅ Ora è Integer
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     numbers = Column(String, nullable=False)
     purchase_time = Column(DateTime, default=func.now())
 
@@ -66,7 +66,7 @@ class Transaction(Base):
     __tablename__ = "transactions"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # ✅ Ora è Integer
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # ✅ Ora è Integer
     transaction_type = Column(String, nullable=False)  # deposit, withdraw, win
     amount = Column(Float, nullable=False)
     timestamp = Column(DateTime, default=func.now())
