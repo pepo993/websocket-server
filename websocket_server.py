@@ -112,7 +112,7 @@ async def notify_clients():
                 jackpot = round(cartelle_vendute * config.COSTO_CARTELLA, 2)
 
                 stato_attuale = {
-                    "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] and game_data["game_status"]["game_active"] else None,
+                    "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] and game_data.get("game_status", {}).get("game_active", True) else None,
 
                     "numeri_estratti": game_data["drawn_numbers"],
                     "game_status": {
