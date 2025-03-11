@@ -36,7 +36,13 @@ async def load_game_state():
                 result = await db.execute(select(Game).order_by(Game.start_time.desc()))
                 game = result.scalars().first()
                 if not game:
-                    return {"drawn_numbers": [], "players": {}, "winners": {}, "next_game_time": int(time.time() + 120)}
+                    return {
+                        "drawn_numbers": [],
+                        "players": {},
+                        "winners": {},
+                        "next_game_time": int(time.time() + 120),
+                        "game_active": False
+                    }
             
             logging.info(f"🎮 Partita trovata: {game.game_id}")
 
@@ -59,12 +65,18 @@ async def load_game_state():
                 "drawn_numbers": drawn_numbers,
                 "players": players,
                 "winners": {},
-                "next_game_time": int(time.time() + 120) if not game.active else None
+                "next_game_time": int(time.time() + 120) if not game.active else None,
+                "game_active": game.active
             }
         except Exception as e:
             logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
-            logging.error(traceback.format_exc())  # 🔥 Stack trace completo
-            return {"drawn_numbers": [], "players": {}, "winners": {}, "next_game_time": int(time.time() + 120)}
+            return {
+                "drawn_numbers": [],
+                "players": {},
+                "winners": {},
+                "next_game_time": int(time.time() + 120),
+                "game_active": False
+            }
 
 # 📌 Gestione delle connessioni WebSocket
 async def handler(websocket):
