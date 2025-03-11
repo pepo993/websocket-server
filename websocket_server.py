@@ -13,16 +13,11 @@ from config import COSTO_CARTELLA
 import traceback  # 🔥 Per log più dettagliati
 import config 
 
-# 📌 Assicura che INFO vada su stdout
-import sys
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
-    stream=sys.stdout  
-)
-
 # 📌 Imposta il logging dettagliato
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+import sys
+logging.basicConfig( level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s",
+stream=sys.stdout  #  Assicura che INFO vada su stdout
+)
 
 # 📌 Porta assegnata per Railway (default: 8002)
 PORT = int(os.getenv("PORT", 8002))
