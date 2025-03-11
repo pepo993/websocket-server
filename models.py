@@ -48,9 +48,9 @@ class Ticket(Base):
     __tablename__ = "tickets"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    game_id = Column(Integer, ForeignKey("games.id", ondelete="CASCADE"), nullable=False)  # ✅ Cambiato a Integer
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)  # ✅ Cambiato a Integer
-    numbers = Column(String, nullable=False)  # Cartella in formato stringa (numeri separati da virgole)
+    game_id = Column(Integer, ForeignKey("games.id", ondelete="CASCADE"), nullable=False)  # ✅ Ora è Integer
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    numbers = Column(String, nullable=False)
     purchase_time = Column(DateTime, default=func.now())
 
     # 📌 Relazioni
