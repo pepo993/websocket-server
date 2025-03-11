@@ -49,14 +49,16 @@ async def load_game_state():
                 logging.info(f"🎟️ Biglietti trovati: {len(tickets)}")
             except Exception as e:
                 logging.error(f"❌ Errore nel recupero dei ticket: {e}")
-                logging.error(traceback.format_exc())
                 return {"drawn_numbers": drawn_numbers, "players": {}, "winners": {}}
 
             players = {}
             for ticket in tickets:
                 if ticket.user_id not in players:
                     players[ticket.user_id] = {"cartelle": []}
-                players[ticket.user_id]["cartelle"].append(list(map(int, ticket.numbers.split(","))))
+                try:
+                    players[ticket.user_id]["cartelle"].append(json.loads(ticket.numbers))  # ✅ Fix JSON
+                except json.JSONDecodeError:
+                    logging.error(f"❌ Errore nel parsing JSON per il ticket di {ticket.user_id}")
 
             logging.info(f"👥 Giocatori trovati: {len(players)}")
 
@@ -67,7 +69,7 @@ async def load_game_state():
             }
         except Exception as e:
             logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
-            logging.error(traceback.format_exc())  # 🔥 Stack trace completo
+            logging.error(traceback.format_exc())
             return {"drawn_numbers": [], "players": {}, "winners": {}}
 
 # 📌 Funzione per salvare lo stato del gioco
