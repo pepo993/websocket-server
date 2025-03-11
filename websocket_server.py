@@ -39,26 +39,24 @@ async def load_game_state():
                 game = result.scalars().first()
                 if not game:
                     return {
-                        "drawn_numbers": drawn_numbers,
-                        "players": players,
+                        "drawn_numbers": [],
+                        "players": {},  # ✅ Assicura che `players` non sia mai `None`
                         "winners": {},
-                        "next_game_time": int(time.time() + 120) if not game.active else None,
                         "game_status": {
-                        "game_active": game.active,
-                        "cartelle_vendute": len(players),
-                        "jackpot": game.jackpot,
-                        "giocatori_attivi": len(players),
-                        "vincitori": {},
-                            }
+                            "game_active": False,
+                            "next_game_time": int(time.time() + 120),
+                            "cartelle_vendute": 0,
+                            "jackpot": 0.0,
+                            "giocatori_attivi": 0
                         }
+                    }
 
-            
             logging.info(f"🎮 Partita trovata: {game.game_id}")
 
             drawn_numbers = list(map(int, game.drawn_numbers.split(","))) if game.drawn_numbers else []
             logging.info(f"🔢 Numeri estratti: {len(drawn_numbers)} su 90")
 
-            result = await db.execute(select(Ticket).filter(Ticket.game_id == game.game_id))
+            result = await db.execute(select(Ticket).filter(Ticket.game_id == game.id))
             tickets = result.scalars().all()
             logging.info(f"🎟️ Biglietti trovati: {len(tickets)}")
 
@@ -71,33 +69,31 @@ async def load_game_state():
             logging.info(f"👥 Giocatori trovati: {len(players)}")
 
             return {
-                        "drawn_numbers": drawn_numbers,
-                        "players": players,
-                        "winners": {},
-                        "next_game_time": int(time.time() + 120) if not game.active else None,
-                        "game_status": {
-                        "game_active": game.active,
-                        "cartelle_vendute": len(players),
-                        "jackpot": game.jackpot,
-                        "giocatori_attivi": len(players),
-                        "vincitori": {},
-                            }
-                        }
+                "drawn_numbers": drawn_numbers,
+                "players": players if players else {},  # ✅ Imposta `{}` se `players` è `None`
+                "winners": {},
+                "game_status": {
+                    "game_active": game.active,
+                    "next_game_time": int(time.time() + 120) if not game.active else None,
+                    "cartelle_vendute": len(players) if players else 0,
+                    "jackpot": game.jackpot,
+                    "giocatori_attivi": len(players) if players else 0,
+                }
+            }
         except Exception as e:
             logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
             return {
-                        "drawn_numbers": drawn_numbers,
-                        "players": players,
-                        "winners": {},
-                        "next_game_time": int(time.time() + 120) if not game.active else None,
-                        "game_status": {
-                        "game_active": game.active,
-                        "cartelle_vendute": len(players),
-                        "jackpot": game.jackpot,
-                        "giocatori_attivi": len(players),
-                        "vincitori": {},
-                            }
-                        }
+                "drawn_numbers": [],
+                "players": {},  # ✅ Evita errore su `players`
+                "winners": {},
+                "game_status": {
+                    "game_active": False,
+                    "next_game_time": int(time.time() + 120),
+                    "cartelle_vendute": 0,
+                    "jackpot": 0.0,
+                    "giocatori_attivi": 0
+                }
+            }
 
 # 📌 Gestione delle connessioni WebSocket
 async def handler(websocket):
@@ -122,39 +118,44 @@ async def notify_clients():
                 game_data = await load_game_state()
                 await asyncio.sleep(1.5)
 
-                if not game_data or "drawn_numbers" not in game_data or "players" not in game_data:
+                if not game_data or "drawn_numbers" not in game_data:
                     logging.error("❌ Dati di gioco non validi.")
                     await asyncio.sleep(3)
                     continue  
 
+                # ⏳ Imposta il tempo della prossima partita se non esiste
                 next_game_time = game_data.get("next_game_time") or int(time.time() + 120)
 
-                cartelle_vendute = sum(len(p["cartelle"]) for p in game_data.get("players", {}).values())
+                # 📌 Costruisce lo stato attuale del gioco
+                players = game_data.get("players", {})  # ✅ Assicura che `players` esista sempre
+                cartelle_vendute = sum(len(p["cartelle"]) for p in players.values()) if players else 0
                 jackpot = round(cartelle_vendute * config.COSTO_CARTELLA, 2)
 
                 stato_attuale = {
-                    "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] and game_data["game_status"]["game_active"] else None,
-
+                    "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
                     "numeri_estratti": game_data["drawn_numbers"],
                     "game_status": {
                         "cartelle_vendute": cartelle_vendute,
                         "jackpot": jackpot,
-                        "giocatori_attivi": len(game_data.get("players", {})),
+                        "giocatori_attivi": len(players),
                         "vincitori": game_data.get("winners", {}),
                         "next_game_time": next_game_time,
                     },
-                    "players": game_data["players"]
+                    "players": players
                 }
 
+                # 📤 Invia solo se lo stato è cambiato
                 if stato_attuale != ultimo_stato_trasmesso:
                     ultimo_stato_trasmesso = stato_attuale
                     message = json.dumps(stato_attuale)
+
                     disconnected_clients = set()
                     for client in connected_clients.copy():
                         try:
                             await client.send(message)
                         except websockets.exceptions.ConnectionClosed:
                             disconnected_clients.add(client)
+
                     for client in disconnected_clients:
                         connected_clients.discard(client)
 
@@ -164,6 +165,7 @@ async def notify_clients():
                 logging.error(f"❌ Errore in notify_clients: {e}")
 
         await asyncio.sleep(2)
+
         
 # 📌 Health Check per Railway
 async def health_check(request):
