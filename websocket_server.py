@@ -31,7 +31,7 @@ def save_game_state(state):
         json.dump(state, f, indent=4)
 
 # 📌 Gestione delle connessioni WebSocket
-async def handler(websocket, path):
+async def handler(websocket):
     """ Gestisce le connessioni WebSocket """
     connected_clients.add(websocket)
     print(f"✅ Nuovo client connesso! Totale: {len(connected_clients)} - {websocket.remote_address}")
