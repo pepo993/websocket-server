@@ -5,6 +5,7 @@ import websockets
 from aiohttp import web
 import logging
 import time
+import config
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from database import SessionLocal
@@ -129,6 +130,7 @@ async def handler(websocket):
         connected_clients.discard(websocket)
         logging.info(f"❌ Client rimosso dalla lista. Totale attivi: {len(connected_clients)}")
 
+
 # 📌 Funzione per notificare i client attivi
 async def notify_clients():
     global ultimo_stato_trasmesso
@@ -139,21 +141,25 @@ async def notify_clients():
                 game_data = await load_game_state()
                 await asyncio.sleep(1.5)
 
-                if not game_data or "drawn_numbers" not in game_data:
+                # 🔍 Verifica validità dei dati di gioco
+                if not game_data or "drawn_numbers" not in game_data or "players" not in game_data:
                     logging.error("❌ Dati di gioco non validi.")
                     await asyncio.sleep(3)
                     continue  
 
                 # ⏳ Imposta il tempo della prossima partita se non esiste
-                next_game_time = game_data.get("next_game_time", int((time.time() + 120) * 1000))
+                next_game_time = game_data.get("next_game_time") or int((time.time() + 120) * 1000)
 
                 # 📌 Costruisce lo stato attuale del gioco
+                cartelle_vendute = sum(len(p["cartelle"]) for p in game_data.get("players", {}).values())
+                jackpot = round(cartelle_vendute * config.COSTO_CARTELLA, 2)  # ✅ Assicuriamoci di arrotondare
+
                 stato_attuale = {
                     "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
                     "numeri_estratti": game_data["drawn_numbers"],
                     "game_status": {
-                        "cartelle_vendute": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()),
-                        "jackpot": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
+                        "cartelle_vendute": cartelle_vendute,
+                        "jackpot": jackpot,
                         "giocatori_attivi": len(game_data.get("players", {})),
                         "vincitori": game_data.get("winners", {}),
                         "next_game_time": next_game_time,
@@ -167,7 +173,7 @@ async def notify_clients():
                     message = json.dumps(stato_attuale)
 
                     disconnected_clients = set()
-                    for client in connected_clients:
+                    for client in connected_clients.copy():  # ✅ Evita modifiche mentre itera
                         try:
                             await client.send(message)
                         except websockets.exceptions.ConnectionClosed:
@@ -182,6 +188,7 @@ async def notify_clients():
                 logging.error(f"❌ Errore in notify_clients: {e}")
 
         await asyncio.sleep(2)
+
 
 # 📌 Health Check per Railway
 async def health_check(request):
