@@ -37,12 +37,19 @@ async def load_game_state():
                 game = result.scalars().first()
                 if not game:
                     return {
-                        "drawn_numbers": [],
-                        "players": {},
+                        "drawn_numbers": drawn_numbers,
+                        "players": players,
                         "winners": {},
-                        "next_game_time": int(time.time() + 120),
-                        "game_active": False
-                    }
+                        "next_game_time": int(time.time() + 120) if not game.active else None,
+                        "game_status": {
+                        "game_active": game.active,
+                        "cartelle_vendute": len(players),
+                        "jackpot": game.jackpot,
+                        "giocatori_attivi": len(players),
+                        "vincitori": {},
+                            }
+                        }
+
             
             logging.info(f"🎮 Partita trovata: {game.game_id}")
 
