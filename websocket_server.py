@@ -10,7 +10,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from database import SessionLocal
 from models import Game, Ticket
-from config import COSTO_CARTELLA
 import traceback  # 🔥 Per log più dettagliati
 
 # 📌 Imposta il logging dettagliato
@@ -31,26 +30,22 @@ async def load_game_state():
 
             result = await db.execute(select(Game).filter(Game.active == True))
             game = result.scalars().first()
-
+            
             if not game:
-                logging.warning("⚠️ Nessuna partita attiva trovata.")
-                return {"drawn_numbers": [], "players": {}, "winners": {}}
+                logging.warning("⚠️ Nessuna partita attiva trovata. Recupero della prossima partita in attesa...")
+                result = await db.execute(select(Game).order_by(Game.start_time.desc()))
+                game = result.scalars().first()
+                if not game:
+                    return {"drawn_numbers": [], "players": {}, "winners": {}, "next_game_time": int(time.time() + 120)}
+            
+            logging.info(f"🎮 Partita trovata: {game.game_id}")
 
-            logging.info(f"🎮 Partita attiva trovata: {game.game_id}")
-
-            # 🔍 Controlla se tutti i numeri sono stati estratti
             drawn_numbers = list(map(int, game.drawn_numbers.split(","))) if game.drawn_numbers else []
             logging.info(f"🔢 Numeri estratti: {len(drawn_numbers)} su 90")
 
-            # 🔹 Recupera i biglietti
-            try:
-                result = await db.execute(select(Ticket).filter(Ticket.game_id == game.game_id))
-                tickets = result.scalars().all()
-                logging.info(f"🎟️ Biglietti trovati: {len(tickets)}")
-            except Exception as e:
-                logging.error(f"❌ Errore nel recupero dei ticket: {e}")
-                logging.error(traceback.format_exc())
-                return {"drawn_numbers": drawn_numbers, "players": {}, "winners": {}}
+            result = await db.execute(select(Ticket).filter(Ticket.game_id == game.game_id))
+            tickets = result.scalars().all()
+            logging.info(f"🎟️ Biglietti trovati: {len(tickets)}")
 
             players = {}
             for ticket in tickets:
@@ -63,73 +58,26 @@ async def load_game_state():
             return {
                 "drawn_numbers": drawn_numbers,
                 "players": players,
-                "winners": {}
+                "winners": {},
+                "next_game_time": int(time.time() + 120) if not game.active else None
             }
         except Exception as e:
             logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
             logging.error(traceback.format_exc())  # 🔥 Stack trace completo
-            return {"drawn_numbers": [], "players": {}, "winners": {}}
-
-# 📌 Funzione per salvare lo stato del gioco
-async def save_game_state(state):
-    async with SessionLocal() as db:
-        try:
-            logging.info("💾 Tentativo di salvataggio dello stato del gioco...")
-
-            result = await db.execute(select(Game).filter(Game.active == True))
-            game = result.scalars().first()
-
-            if game:
-                game.drawn_numbers = ",".join(map(str, state["drawn_numbers"]))
-                await db.commit()
-                logging.info("✅ Stato del gioco aggiornato nel database.")
-            else:
-                logging.warning("⚠️ Nessuna partita attiva trovata per il salvataggio.")
-        except Exception as e:
-            logging.error(f"❌ Errore nel salvataggio dello stato del gioco: {e}")
-            logging.error(traceback.format_exc())  # 🔥 Stack trace completo
-            await db.rollback()
+            return {"drawn_numbers": [], "players": {}, "winners": {}, "next_game_time": int(time.time() + 120)}
 
 # 📌 Gestione delle connessioni WebSocket
 async def handler(websocket):
     connected_clients.add(websocket)
-    logging.info(f"✅ Nuovo client connesso! Totale: {len(connected_clients)} - {websocket.remote_address}")
+    logging.info(f"✅ Nuovo client connesso! Totale: {len(connected_clients)}")
 
     try:
         async for message in websocket:
             logging.info(f"📥 Messaggio ricevuto: {message}")
-
-            try:
-                game_state = json.loads(message)
-                if "drawn_numbers" in game_state:
-                    await save_game_state(game_state)
-                    logging.info("📌 Stato del gioco aggiornato con nuovi numeri estratti.")
-
-                    # 📢 Invia l'aggiornamento a tutti i client connessi
-                    broadcast_message = json.dumps(game_state)
-                    disconnected_clients = set()
-
-                    for client in connected_clients:
-                        try:
-                            await client.send(broadcast_message)
-                        except websockets.exceptions.ConnectionClosed:
-                            disconnected_clients.add(client)
-
-                    # Rimuove i client disconnessi
-                    for client in disconnected_clients:
-                        connected_clients.discard(client)
-                        logging.info(f"❌ Client disconnesso rimosso. Totale attivi: {len(connected_clients)}")
-
-            except json.JSONDecodeError:
-                logging.error("❌ Errore: Messaggio non è un JSON valido.")
-
-    except websockets.exceptions.ConnectionClosed as e:
-        logging.warning(f"⚠️ Client disconnesso normalmente: {e}")
-
+    except websockets.exceptions.ConnectionClosed:
+        logging.info("❌ Client disconnesso.")
     finally:
         connected_clients.discard(websocket)
-        logging.info(f"❌ Client rimosso dalla lista. Totale attivi: {len(connected_clients)}")
-
 
 # 📌 Funzione per notificare i client attivi
 async def notify_clients():
@@ -141,18 +89,15 @@ async def notify_clients():
                 game_data = await load_game_state()
                 await asyncio.sleep(1.5)
 
-                # 🔍 Verifica validità dei dati di gioco
                 if not game_data or "drawn_numbers" not in game_data or "players" not in game_data:
                     logging.error("❌ Dati di gioco non validi.")
                     await asyncio.sleep(3)
                     continue  
 
-                # ⏳ Imposta il tempo della prossima partita se non esiste
-                next_game_time = game_data.get("next_game_time") or int((time.time() + 120) * 1000)
+                next_game_time = game_data.get("next_game_time") or int(time.time() + 120)
 
-                # 📌 Costruisce lo stato attuale del gioco
                 cartelle_vendute = sum(len(p["cartelle"]) for p in game_data.get("players", {}).values())
-                jackpot = round(cartelle_vendute * config.COSTO_CARTELLA, 2)  # ✅ Assicuriamoci di arrotondare
+                jackpot = round(cartelle_vendute * config.COSTO_CARTELLA, 2)
 
                 stato_attuale = {
                     "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
@@ -167,18 +112,15 @@ async def notify_clients():
                     "players": game_data["players"]
                 }
 
-                # 📤 Invia solo se lo stato è cambiato
                 if stato_attuale != ultimo_stato_trasmesso:
                     ultimo_stato_trasmesso = stato_attuale
                     message = json.dumps(stato_attuale)
-
                     disconnected_clients = set()
-                    for client in connected_clients.copy():  # ✅ Evita modifiche mentre itera
+                    for client in connected_clients.copy():
                         try:
                             await client.send(message)
                         except websockets.exceptions.ConnectionClosed:
                             disconnected_clients.add(client)
-
                     for client in disconnected_clients:
                         connected_clients.discard(client)
 
@@ -188,7 +130,6 @@ async def notify_clients():
                 logging.error(f"❌ Errore in notify_clients: {e}")
 
         await asyncio.sleep(2)
-
 
 # 📌 Health Check per Railway
 async def health_check(request):
