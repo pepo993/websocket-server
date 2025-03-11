@@ -10,6 +10,9 @@ from sqlalchemy.future import select
 from database import SessionLocal
 from models import Game, Ticket
 
+# 📌 Porta assegnata per Railway (default: 8002)
+PORT = int(os.getenv("PORT", 8002))
+
 # 📌 Funzione per caricare lo stato del gioco dal database
 async def load_game_state():
     async with SessionLocal() as db:
