@@ -38,12 +38,15 @@ async def load_game_state():
             drawn_numbers = list(map(int, game.drawn_numbers.split(","))) if game.drawn_numbers else []
             logging.info(f"🔢 Numeri estratti: {len(drawn_numbers)} su 90")
 
-            if len(drawn_numbers) >= 90:
-                logging.warning("🏆 Tutti i numeri sono stati estratti, la partita dovrebbe essere chiusa!")
-
-            # Recupera i giocatori e le cartelle
-            result = await db.execute(select(Ticket).filter(Ticket.game_id == game.game_id))
-            tickets = result.scalars().all()
+            # 🔹 Prova a leggere i biglietti
+            try:
+                result = await db.execute(select(Ticket).filter(Ticket.game_id == game.game_id))
+                tickets = result.scalars().all()
+                logging.info(f"🎟️ Biglietti trovati: {len(tickets)}")
+            except Exception as e:
+                logging.error(f"❌ Errore nel recupero dei ticket: {e}")
+                logging.error(traceback.format_exc())
+                return {"drawn_numbers": drawn_numbers, "players": {}, "winners": {}}
 
             players = {}
             for ticket in tickets:
@@ -62,6 +65,7 @@ async def load_game_state():
             logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
             logging.error(traceback.format_exc())  # 🔥 Stack trace completo
             return {"drawn_numbers": [], "players": {}, "winners": {}}
+
 
 async def save_game_state(state):
     async with SessionLocal() as db:
