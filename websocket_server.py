@@ -33,9 +33,12 @@ async def load_game_state():
 
             logging.info(f"🎮 Partita attiva trovata: {game.game_id}")
 
-            # Recupera i numeri estratti
+            # 🔍 Controlla se tutti i numeri sono stati estratti
             drawn_numbers = list(map(int, game.drawn_numbers.split(","))) if game.drawn_numbers else []
-            logging.info(f"🔢 Numeri estratti: {drawn_numbers}")
+            logging.info(f"🔢 Numeri estratti: {len(drawn_numbers)} su 90")
+
+            if len(drawn_numbers) >= 90:
+                logging.warning("🏆 Tutti i numeri sono stati estratti, la partita dovrebbe essere chiusa!")
 
             # Recupera i giocatori e le cartelle
             result = await db.execute(select(Ticket).filter(Ticket.game_id == game.game_id))
@@ -56,7 +59,7 @@ async def load_game_state():
             }
         except Exception as e:
             logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
-            logging.error(traceback.format_exc())  # 🔥 Mostra l'intero stack trace
+            logging.error(traceback.format_exc())  # 🔥 Stack trace completo
             return {"drawn_numbers": [], "players": {}, "winners": {}}
 
 
