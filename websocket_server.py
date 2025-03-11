@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from database import SessionLocal
 from models import Game, Ticket
+import time
 
 # 📌 Porta assegnata per Railway (default: 8002)
 PORT = int(os.getenv("PORT", 8002))
@@ -151,7 +152,6 @@ async def notify_clients():
 
 
                 # ⏳ Imposta il tempo della prossima partita se non esiste
-                import time
                 next_game_time = game_data.get("next_game_time", int((time.time() + 120) * 1000))
 
                 # 📌 Costruisce lo stato attuale del gioco
