@@ -51,6 +51,13 @@ async def load_game_state():
                 logging.error(traceback.format_exc())
                 return {"drawn_numbers": drawn_numbers, "players": {}, "winners": {}}
 
+            # 🔴 Se non ci sono biglietti, chiudiamo la partita
+            if len(tickets) == 0:
+                logging.warning("🚨 Nessun biglietto trovato! Chiudendo automaticamente la partita...")
+                game.active = False
+                await db.commit()
+                return {"drawn_numbers": [], "players": {}, "winners": {}}
+
             players = {}
             for ticket in tickets:
                 if ticket.user_id not in players:
@@ -58,10 +65,6 @@ async def load_game_state():
                 players[ticket.user_id]["cartelle"].append(list(map(int, ticket.numbers.split(","))))
 
             logging.info(f"👥 Giocatori trovati: {len(players)}")
-
-            # ✅ 🔥 FORZA IL COMMIT per evitare il ROLLBACK automatico
-            await db.execute("SELECT 1")  # Query neutra per mantenere la sessione attiva
-            await db.commit()
 
             return {
                 "drawn_numbers": drawn_numbers,
