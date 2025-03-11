@@ -10,6 +10,7 @@ from sqlalchemy.future import select
 from database import SessionLocal
 from models import Game, Ticket
 from config import COSTO_CARTELLA
+import traceback  # 🔥 Per log più dettagliati
 
 # 📌 Porta assegnata per Railway (default: 8002)
 PORT = int(os.getenv("PORT", 8002))
@@ -19,16 +20,16 @@ connected_clients = set()
 ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 
 # 📌 Funzione per caricare lo stato del gioco dal database
-import traceback  # 🔥 Importiamo traceback per log più dettagliati
-
 async def load_game_state():
     async with SessionLocal() as db:
         try:
+            logging.info("🔄 Caricamento stato del gioco dal database...")
+
             result = await db.execute(select(Game).filter(Game.active == True))
             game = result.scalars().first()
-            
+
             if not game:
-                logging.warning("⚠️ Nessuna partita attiva trovata nel database.")
+                logging.warning("⚠️ Nessuna partita attiva trovata.")
                 return {"drawn_numbers": [], "players": {}, "winners": {}}
 
             logging.info(f"🎮 Partita attiva trovata: {game.game_id}")
@@ -62,6 +63,24 @@ async def load_game_state():
             logging.error(traceback.format_exc())  # 🔥 Stack trace completo
             return {"drawn_numbers": [], "players": {}, "winners": {}}
 
+async def save_game_state(state):
+    async with SessionLocal() as db:
+        try:
+            logging.info("💾 Tentativo di salvataggio dello stato del gioco...")
+
+            result = await db.execute(select(Game).filter(Game.active == True))
+            game = result.scalars().first()
+
+            if game:
+                game.drawn_numbers = ",".join(map(str, state["drawn_numbers"]))
+                await db.commit()
+                logging.info("✅ Stato del gioco aggiornato nel database.")
+            else:
+                logging.warning("⚠️ Nessuna partita attiva trovata per il salvataggio.")
+        except Exception as e:
+            logging.error(f"❌ Errore nel salvataggio dello stato del gioco: {e}")
+            logging.error(traceback.format_exc())  # 🔥 Stack trace completo
+            await db.rollback()
 
 # 📌 Gestione delle connessioni WebSocket
 async def handler(websocket):
@@ -102,21 +121,6 @@ async def handler(websocket):
     finally:
         connected_clients.discard(websocket)
         logging.info(f"❌ Client rimosso dalla lista. Totale attivi: {len(connected_clients)}")
-
-
-# 📌 Funzione per salvare lo stato del gioco nel database
-async def save_game_state(state):
-    async with SessionLocal() as db:
-        try:
-            result = await db.execute(select(Game).filter(Game.active == True))
-            game = result.scalars().first()
-            
-            if game:
-                game.drawn_numbers = ",".join(map(str, state["drawn_numbers"]))
-                await db.commit()
-                logging.info("✅ Stato del gioco aggiornato nel database.")
-        except Exception as e:
-            logging.error(f"❌ Errore nel salvataggio dello stato del gioco: {e}")
             
 # 📌 Funzione per notificare i client attivi
 async def notify_clients():
