@@ -164,6 +164,7 @@ async def notify_clients():
         await asyncio.sleep(2)  # Mantiene un intervallo di aggiornamento di 2s
 
 
+
 # 📌 Health Check per Railway
 async def health_check(request):
     return web.Response(text="OK", status=200)
