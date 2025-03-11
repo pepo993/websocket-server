@@ -69,21 +69,33 @@ async def load_game_state():
             logging.info(f"👥 Giocatori trovati: {len(players)}")
 
             return {
-                "drawn_numbers": drawn_numbers,
-                "players": players,
-                "winners": {},
-                "next_game_time": int(time.time() + 120) if not game.active else None,
-                "game_active": game.active
-            }
+                        "drawn_numbers": drawn_numbers,
+                        "players": players,
+                        "winners": {},
+                        "next_game_time": int(time.time() + 120) if not game.active else None,
+                        "game_status": {
+                        "game_active": game.active,
+                        "cartelle_vendute": len(players),
+                        "jackpot": game.jackpot,
+                        "giocatori_attivi": len(players),
+                        "vincitori": {},
+                            }
+                        }
         except Exception as e:
             logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
             return {
-                "drawn_numbers": [],
-                "players": {},
-                "winners": {},
-                "next_game_time": int(time.time() + 120),
-                "game_active": False
-            }
+                        "drawn_numbers": drawn_numbers,
+                        "players": players,
+                        "winners": {},
+                        "next_game_time": int(time.time() + 120) if not game.active else None,
+                        "game_status": {
+                        "game_active": game.active,
+                        "cartelle_vendute": len(players),
+                        "jackpot": game.jackpot,
+                        "giocatori_attivi": len(players),
+                        "vincitori": {},
+                            }
+                        }
 
 # 📌 Gestione delle connessioni WebSocket
 async def handler(websocket):
