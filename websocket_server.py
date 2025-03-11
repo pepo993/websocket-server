@@ -42,28 +42,16 @@ async def load_game_state():
                     players[ticket.user_id] = {"cartelle": []}
                 players[ticket.user_id]["cartelle"].append(list(map(int, ticket.numbers.split(","))))
 
+            logging.info(f"✅ Stato del gioco caricato con {len(drawn_numbers)} numeri estratti e {len(players)} giocatori.")
             return {
                 "drawn_numbers": drawn_numbers,
                 "players": players,
                 "winners": {}  # I vincitori saranno aggiornati separatamente
             }
         except Exception as e:
-            logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
+            logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}", exc_info=True)  # Mostra l'errore completo
             return {"drawn_numbers": [], "players": {}, "winners": {}}
 
-# 📌 Funzione per salvare lo stato del gioco nel database
-async def save_game_state(state):
-    async with SessionLocal() as db:
-        try:
-            result = await db.execute(select(Game).filter(Game.active == True))
-            game = result.scalars().first()
-            
-            if game:
-                game.drawn_numbers = ",".join(map(str, state["drawn_numbers"]))
-                await db.commit()
-                logging.info("✅ Stato del gioco aggiornato nel database.")
-        except Exception as e:
-            logging.error(f"❌ Errore nel salvataggio dello stato del gioco: {e}")
 
 # 📌 Gestione delle connessioni WebSocket
 async def handler(websocket):
@@ -105,6 +93,21 @@ async def handler(websocket):
         connected_clients.discard(websocket)
         logging.info(f"❌ Client rimosso dalla lista. Totale attivi: {len(connected_clients)}")
 
+
+# 📌 Funzione per salvare lo stato del gioco nel database
+async def save_game_state(state):
+    async with SessionLocal() as db:
+        try:
+            result = await db.execute(select(Game).filter(Game.active == True))
+            game = result.scalars().first()
+            
+            if game:
+                game.drawn_numbers = ",".join(map(str, state["drawn_numbers"]))
+                await db.commit()
+                logging.info("✅ Stato del gioco aggiornato nel database.")
+        except Exception as e:
+            logging.error(f"❌ Errore nel salvataggio dello stato del gioco: {e}")
+            
 # 📌 Funzione per notificare i client attivi
 async def notify_clients():
     global ultimo_stato_trasmesso
