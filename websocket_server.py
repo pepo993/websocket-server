@@ -43,6 +43,18 @@ async def load_game_state():
             logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
             return {"drawn_numbers": [], "players": {}, "winners": {}}
 
+async def save_game_state(state):
+    async with SessionLocal() as db:
+        try:
+            result = await db.execute(select(Game).filter(Game.active == True))
+            game = result.scalars().first()
+            
+            if game:
+                game.drawn_numbers = ",".join(map(str, state["drawn_numbers"]))
+                await db.commit()
+                logging.info("✅ Stato del gioco aggiornato nel database.")
+        except Exception as e:
+            logging.error(f"❌ Errore nel salvataggio dello stato del gioco: {e}")
 
 # 📌 Gestione delle connessioni WebSocket
 async def handler(websocket):
