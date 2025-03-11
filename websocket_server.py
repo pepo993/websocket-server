@@ -12,6 +12,9 @@ from models import Game, Ticket
 from config import COSTO_CARTELLA
 import traceback  # 🔥 Per log più dettagliati
 
+# 📌 Imposta il logging dettagliato
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
 # 📌 Porta assegnata per Railway (default: 8002)
 PORT = int(os.getenv("PORT", 8002))
 
@@ -38,7 +41,7 @@ async def load_game_state():
             drawn_numbers = list(map(int, game.drawn_numbers.split(","))) if game.drawn_numbers else []
             logging.info(f"🔢 Numeri estratti: {len(drawn_numbers)} su 90")
 
-            # 🔹 Prova a leggere i biglietti
+            # 🔹 Recupera i biglietti
             try:
                 result = await db.execute(select(Ticket).filter(Ticket.game_id == game.game_id))
                 tickets = result.scalars().all()
@@ -66,7 +69,7 @@ async def load_game_state():
             logging.error(traceback.format_exc())  # 🔥 Stack trace completo
             return {"drawn_numbers": [], "players": {}, "winners": {}}
 
-
+# 📌 Funzione per salvare lo stato del gioco
 async def save_game_state(state):
     async with SessionLocal() as db:
         try:
@@ -98,7 +101,7 @@ async def handler(websocket):
             try:
                 game_state = json.loads(message)
                 if "drawn_numbers" in game_state:
-                    await save_game_state(game_state)  # 🛠️ Aggiunto `await`
+                    await save_game_state(game_state)
                     logging.info("📌 Stato del gioco aggiornato con nuovi numeri estratti.")
 
                     # 📢 Invia l'aggiornamento a tutti i client connessi
@@ -125,7 +128,7 @@ async def handler(websocket):
     finally:
         connected_clients.discard(websocket)
         logging.info(f"❌ Client rimosso dalla lista. Totale attivi: {len(connected_clients)}")
-            
+
 # 📌 Funzione per notificare i client attivi
 async def notify_clients():
     global ultimo_stato_trasmesso
