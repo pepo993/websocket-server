@@ -3,16 +3,20 @@ import json
 import asyncio
 import websockets
 from aiohttp import web
-from config import COSTO_CARTELLA
-
+import logging
+import time
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from database import SessionLocal
 from models import Game, Ticket
-import time
+from config import COSTO_CARTELLA
 
 # 📌 Porta assegnata per Railway (default: 8002)
 PORT = int(os.getenv("PORT", 8002))
+
+# 📌 Set di client connessi
+connected_clients = set()
+ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 
 # 📌 Funzione per caricare lo stato del gioco dal database
 async def load_game_state():
@@ -47,6 +51,7 @@ async def load_game_state():
             logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
             return {"drawn_numbers": [], "players": {}, "winners": {}}
 
+# 📌 Funzione per salvare lo stato del gioco nel database
 async def save_game_state(state):
     async with SessionLocal() as db:
         try:
@@ -62,38 +67,43 @@ async def save_game_state(state):
 
 # 📌 Gestione delle connessioni WebSocket
 async def handler(websocket):
-    """ Gestisce le connessioni WebSocket """
     connected_clients.add(websocket)
-    print(f"✅ Nuovo client connesso! Totale: {len(connected_clients)} - {websocket.remote_address}")
+    logging.info(f"✅ Nuovo client connesso! Totale: {len(connected_clients)} - {websocket.remote_address}")
 
     try:
         async for message in websocket:
-            print(f"📥 Messaggio ricevuto: {message}")
+            logging.info(f"📥 Messaggio ricevuto: {message}")
 
             try:
                 game_state = json.loads(message)
                 if "drawn_numbers" in game_state:
-                    save_game_state(game_state)
-                    print("📌 Stato del gioco aggiornato con nuovi numeri estratti.")
+                    await save_game_state(game_state)  # 🛠️ Aggiunto `await`
+                    logging.info("📌 Stato del gioco aggiornato con nuovi numeri estratti.")
 
                     # 📢 Invia l'aggiornamento a tutti i client connessi
                     broadcast_message = json.dumps(game_state)
-                    for client in list(connected_clients):  # Itera su una copia per evitare problemi di rimozione
+                    disconnected_clients = set()
+
+                    for client in connected_clients:
                         try:
                             await client.send(broadcast_message)
                         except websockets.exceptions.ConnectionClosed:
-                            connected_clients.discard(client)
-                            print(f"❌ Client disconnesso rimosso. Totale attivi: {len(connected_clients)}")
+                            disconnected_clients.add(client)
+
+                    # Rimuove i client disconnessi
+                    for client in disconnected_clients:
+                        connected_clients.discard(client)
+                        logging.info(f"❌ Client disconnesso rimosso. Totale attivi: {len(connected_clients)}")
 
             except json.JSONDecodeError:
-                print("❌ Errore: Messaggio non è un JSON valido.")
+                logging.error("❌ Errore: Messaggio non è un JSON valido.")
 
     except websockets.exceptions.ConnectionClosed as e:
-        print(f"⚠️ Client disconnesso normalmente: {e}")
+        logging.warning(f"⚠️ Client disconnesso normalmente: {e}")
 
     finally:
         connected_clients.discard(websocket)
-        print(f"❌ Client rimosso dalla lista. Totale attivi: {len(connected_clients)}")
+        logging.info(f"❌ Client rimosso dalla lista. Totale attivi: {len(connected_clients)}")
 
 # 📌 Funzione per notificare i client attivi
 async def notify_clients():
@@ -103,53 +113,12 @@ async def notify_clients():
         if connected_clients:
             try:
                 game_data = await load_game_state()
-                await asyncio.sleep(1.5)  # Evita di inviare troppi aggiornamenti
+                await asyncio.sleep(1.5)
 
                 if not game_data or "drawn_numbers" not in game_data:
                     logging.error("❌ Dati di gioco non validi.")
                     await asyncio.sleep(3)
                     continue  
-
-                # Costruisce lo stato attuale del gioco
-                stato_attuale = {
-                    "numero_estratto": game_data["drawn_numbers"][-1] if game_data.get("drawn_numbers") else 0,
-                    "numeri_estratti": game_data.get("drawn_numbers", []),
-                    "game_status": {
-                        "cartelle_vendute": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()),
-                        "jackpot": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()) * 0.2, # Costo cartella 0.2 TON
-                        "giocatori_attivi": len(game_data.get("players", {})),
-                        "winners": game_data.get("winners", {}),
-                    },
-                    "players": game_data.get("players", {})
-                }
-
-                # Evita di inviare aggiornamenti duplicati
-                if stato_attuale == ultimo_stato_trasmesso:
-                    await asyncio.sleep(3)
-                    continue  
-                    
-                # Aggiorniamo lo stato trasmesso solo se è cambiato
-                ultimo_stato_trasmesso = json.loads(json.dumps(stato_attuale))  # Deep copy
-                message = json.dumps(stato_attuale)
-
-                disconnected_clients = set()
-                for client in connected_clients:
-                    try:
-                        await client.send(message)
-                    except websockets.exceptions.ConnectionClosed:
-                        logging.warning("⚠️ Errore WebSocket durante l'invio.")
-                        disconnected_clients.add(client)
-
-                # Rimuove i client disconnessi
-                for client in disconnected_clients:
-                    connected_clients.discard(client)
-                    logging.info(f"❌ Client disconnesso rimosso. Totale attivi: {len(connected_clients)}")
-
-            except Exception as e:
-                logging.error(f"❌ Errore in notify_clients: {e}")
-
-        await asyncio.sleep(2)  # Mantiene un intervallo di aggiornamento di 2s
-
 
                 # ⏳ Imposta il tempo della prossima partita se non esiste
                 next_game_time = game_data.get("next_game_time", int((time.time() + 120) * 1000))
@@ -159,63 +128,63 @@ async def notify_clients():
                     "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
                     "numeri_estratti": game_data["drawn_numbers"],
                     "game_status": {
-                        "cartelle_vendute": sum(len(p) for p in game_data.get("players", {}).values()),
-                        "jackpot": sum(len(p) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
+                        "cartelle_vendute": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()),
+                        "jackpot": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
                         "giocatori_attivi": len(game_data.get("players", {})),
                         "vincitori": game_data.get("winners", {}),
                         "next_game_time": next_game_time,
                     },
-                    "players": {
-                        user_id: {"cartelle": game_data["players"][user_id]}
-                        for user_id in game_data.get("players", {})
-                    }
+                    "players": game_data["players"]
                 }
 
                 # 📤 Invia solo se lo stato è cambiato
                 if stato_attuale != ultimo_stato_trasmesso:
-                    ultimo_stato_trasmesso = stato_attuale  # Aggiorna lo stato memorizzato
+                    ultimo_stato_trasmesso = stato_attuale
                     message = json.dumps(stato_attuale)
 
-                    for client in list(connected_clients):  # Itera su una copia per sicurezza
+                    disconnected_clients = set()
+                    for client in connected_clients:
                         try:
                             await client.send(message)
                         except websockets.exceptions.ConnectionClosed:
-                            connected_clients.discard(client)
-                            print(f"❌ Client disconnesso rimosso. Totale attivi: {len(connected_clients)}")
+                            disconnected_clients.add(client)
 
-                    print(f"📤 Dati inviati ai client WebSocket: {message}")
+                    for client in disconnected_clients:
+                        connected_clients.discard(client)
+
+                    logging.info(f"📤 Dati inviati ai client WebSocket: {message}")
 
             except Exception as e:
-                print(f"❌ Errore in notify_clients: {e}")
+                logging.error(f"❌ Errore in notify_clients: {e}")
 
-        await asyncio.sleep(2)  # Mantiene un intervallo di aggiornamento di 2s
+        await asyncio.sleep(2)
 
 # 📌 Health Check per Railway
 async def health_check(request):
     return web.Response(text="OK", status=200)
 
-# Configura il server HTTP per l'health check
+# 📌 Configura il server HTTP per l'health check
 app = web.Application()
 app.router.add_get('/health', health_check)
 
 # 📌 Avvio del WebSocket Server
 async def start_server():
-    async with websockets.serve(handler, "0.0.0.0", PORT, ping_interval=None, ping_timeout=None) as websocket_server:
-        print(f"🚀 WebSocket Server avviato su ws://0.0.0.0:{PORT}")
+    websocket_server = await websockets.serve(handler, "0.0.0.0", PORT, ping_interval=None, ping_timeout=None)
 
-        # Avvia il server HTTP per l'health check
-        runner = web.AppRunner(app)
-        await runner.setup()
-        site = web.TCPSite(runner, "0.0.0.0", 8080)
-        await site.start()
-        print("✅ Health check attivo su http://0.0.0.0:8080/health")
+    logging.info(f"🚀 WebSocket Server avviato su ws://0.0.0.0:{PORT}")
 
-        await asyncio.gather(websocket_server.wait_closed(), notify_clients())
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", 8080)
+    await site.start()
+    logging.info("✅ Health check attivo su http://0.0.0.0:8080/health")
+
+    await asyncio.gather(websocket_server.wait_closed(), notify_clients())
 
 # 📌 Avvio del server
 if __name__ == "__main__":
     try:
         asyncio.run(start_server())
     except Exception as e:
-        print(f"❌ Errore nell'avvio del WebSocket Server: {e}")
+        logging.error(f"❌ Errore nell'avvio del WebSocket Server: {e}")
 
