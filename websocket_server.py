@@ -51,6 +51,13 @@ async def load_game_state():
                 logging.error(traceback.format_exc())
                 return {"drawn_numbers": drawn_numbers, "players": {}, "winners": {}}
 
+            # 🔴 Se non ci sono biglietti, chiudiamo la partita
+            if len(tickets) == 0:
+                logging.warning("🚨 Nessun biglietto trovato! Chiudendo automaticamente la partita...")
+                game.active = False
+                await db.commit()
+                return {"drawn_numbers": [], "players": {}, "winners": {}}
+
             players = {}
             for ticket in tickets:
                 if ticket.user_id not in players:
@@ -68,6 +75,7 @@ async def load_game_state():
             logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
             logging.error(traceback.format_exc())  # 🔥 Stack trace completo
             return {"drawn_numbers": [], "players": {}, "winners": {}}
+
 
 # 📌 Funzione per salvare lo stato del gioco
 async def save_game_state(state):
