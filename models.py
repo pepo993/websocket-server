@@ -8,7 +8,7 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    telegram_id = Column(Integer, unique=True, index=True, nullable=False)  # ✅ Cambiato a Integer
+    telegram_id = Column(String, unique=True, index=True, nullable=False)  # ✅ Cambiato a Integer
     username = Column(String, nullable=True)
     first_name = Column(String, nullable=True)
     last_name = Column(String, nullable=True)
@@ -48,7 +48,7 @@ class Ticket(Base):
     __tablename__ = "tickets"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    game_id = Column(Integer, ForeignKey("games.id", ondelete="CASCADE"), nullable=False)  # ✅ Ora è Integer
+    game_id = Column(String, ForeignKey("games.id", ondelete="CASCADE"), nullable=False)  # ✅ Ora è Integer
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     numbers = Column(String, nullable=False)
     purchase_time = Column(DateTime, default=func.now())
