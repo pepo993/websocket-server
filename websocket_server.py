@@ -81,31 +81,24 @@ async def save_game_state(state):
         try:
             logging.info("💾 Tentativo di salvataggio dello stato del gioco...")
 
-            # 🔹 Recupera la partita attiva forzando il refresh della cache
-            result = await db.execute(select(Game).filter(Game.active == True).execution_options(synchronize_session=False))
+            result = await db.execute(select(Game).filter(Game.active == True))
             game = result.scalars().first()
 
             if game:
-                logging.info(f"📝 DEBUG: Salvataggio numeri estratti: {state['drawn_numbers']}")
-
-                drawn_numbers = state.get("drawn_numbers", [])
-                game.drawn_numbers = ",".join(map(str, drawn_numbers)) if drawn_numbers else ""
-
+                game.drawn_numbers = ",".join(map(str, state["drawn_numbers"]))
                 await db.commit()
                 logging.info("✅ Stato del gioco aggiornato nel database.")
             else:
                 logging.warning("⚠️ Nessuna partita attiva trovata per il salvataggio.")
         except Exception as e:
             logging.error(f"❌ Errore nel salvataggio dello stato del gioco: {e}")
-            logging.error(traceback.format_exc())
+            logging.error(traceback.format_exc())  # 🔥 Stack trace completo
             await db.rollback()
 
 # 📌 Gestione delle connessioni WebSocket
 ultimo_numero_estratto = None  # Memorizza l'ultimo numero notificato
-numeri_gia_inviati = set()  # Memorizza tutti i numeri già inviati ai client
-
 async def handler(websocket):
-    global ultimo_numero_estratto, numeri_gia_inviati
+    global ultimo_numero_estratto
     connected_clients.add(websocket)
     logging.info(f"✅ Nuovo client connesso! Totale: {len(connected_clients)} - {websocket.remote_address}")
 
@@ -118,11 +111,11 @@ async def handler(websocket):
                 numero_estratto = game_state.get("numero_estratto")
 
                 # 🔹 Blocca aggiornamenti duplicati
-                if numero_estratto in numeri_gia_inviati:
+                if numero_estratto == ultimo_numero_estratto:
                     logging.warning(f"⚠️ Numero {numero_estratto} già notificato, evitando duplicato")
                     continue
 
-                numeri_gia_inviati.add(numero_estratto)  # ✅ Memorizza il numero estratto
+                ultimo_numero_estratto = numero_estratto  # ✅ Memorizza l'ultimo numero
 
                 if "drawn_numbers" in game_state:
                     await save_game_state(game_state)
