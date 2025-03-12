@@ -65,10 +65,7 @@ async def load_game_state():
                 if ticket.user_id not in players:
                     players[ticket.user_id] = {"cartelle": []}
                 try:
-                    players[ticket.user_id]["cartelle"].append(
-                    json.dumps([num.number for num in ticket.numbers_list])  # ✅ Recupera i numeri dalla relazione numbers_list
-                    )
-
+                    players[ticket.user_id]["cartelle"].append(json.loads(ticket.numbers))  # ✅ Fix JSON
                 except json.JSONDecodeError:
                     logging.error(f"❌ Errore nel parsing JSON per il ticket di {ticket.user_id}")
 
