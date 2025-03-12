@@ -65,27 +65,21 @@ async def load_game_state():
                 if ticket.user_id not in players:
                     players[ticket.user_id] = {"cartelle": []}
                 try:
-                    # 📌 Recupera i numeri di ogni cartella da `ticket_numbers`
-                    result = await db.execute(select(TicketNumber.number).filter(TicketNumber.ticket_id == ticket.id))
-                    ticket_numbers = [row[0] for row in result.all()]  # Estrai solo i numeri
-
-                    players[ticket.user_id]["cartelle"].append(ticket_numbers)  # ✅ Ora i numeri sono caricati correttamente!
-
-                    logging.info(f"👥 Giocatori trovati: {len(players)}")
-
-                return {
-                    "drawn_numbers": list(map(int, game.drawn_numbers.split(","))) if game.drawn_numbers else [],
-                    "players": players,
-                    "winners": {}
-                }
-
-            except Exception as e:
-                logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
-                return {"drawn_numbers": [], "players": {}, "winners": {}}
-
+                    players[ticket.user_id]["cartelle"].append(json.loads(ticket.numbers))  # ✅ Fix JSON
                 except json.JSONDecodeError:
                     logging.error(f"❌ Errore nel parsing JSON per il ticket di {ticket.user_id}")
-                    logging.info(f"👥 Giocatori trovati: {len(players)}")
+
+            logging.info(f"👥 Giocatori trovati: {len(players)}")
+
+            return {
+                "drawn_numbers": drawn_numbers,
+                "players": players,
+                "winners": {}
+            }
+        except Exception as e:
+            logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
+            logging.error(traceback.format_exc())
+            return {"drawn_numbers": [], "players": {}, "winners": {}}
 
 # 📌 Funzione per salvare lo stato del gioco
 async def save_game_state(state):
@@ -228,15 +222,12 @@ app.router.add_get('/health', health_check)
 # 📌 Avvio del WebSocket Server
 async def start_server():
     websocket_server = await websockets.serve(handler, "0.0.0.0", PORT, ping_interval=None, ping_timeout=None)
-
     logging.info(f"🚀 WebSocket Server avviato su ws://0.0.0.0:{PORT}")
-
     runner = web.AppRunner(app)
     await runner.setup()
     site = web.TCPSite(runner, "0.0.0.0", 8080)
     await site.start()
     logging.info("✅ Health check attivo su http://0.0.0.0:8080/health")
-
     await asyncio.gather(websocket_server.wait_closed(), notify_clients())
 
 # 📌 Avvio del server
@@ -244,6 +235,4 @@ if __name__ == "__main__":
     try:
         asyncio.run(start_server())
     except Exception as e:
-        logging.error(f"❌ Errore nell'avvio del WebSocket Server: {e}")
-
         logging.error(f"❌ Errore nell'avvio del WebSocket Server: {e}")
