@@ -85,18 +85,7 @@ async def load_game_state():
 
                 except json.JSONDecodeError:
                     logging.error(f"❌ Errore nel parsing JSON per il ticket di {ticket.user_id}")
-
-            logging.info(f"👥 Giocatori trovati: {len(players)}")
-
-            return {
-                "drawn_numbers": drawn_numbers,
-                "players": players,
-                "winners": {}
-            }
-        except Exception as e:
-            logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
-            logging.error(traceback.format_exc())
-            return {"drawn_numbers": [], "players": {}, "winners": {}}
+                    logging.info(f"👥 Giocatori trovati: {len(players)}")
 
 # 📌 Funzione per salvare lo stato del gioco
 async def save_game_state(state):
