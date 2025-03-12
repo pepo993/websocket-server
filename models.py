@@ -34,17 +34,27 @@ class Game(Base):
 
     tickets = relationship("Ticket", back_populates="game", cascade="all, delete-orphan")
 
+class TicketNumber(Base):
+    __tablename__ = "ticket_numbers"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    ticket_id = Column(Integer, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False)
+    number = Column(Integer, nullable=False)
+
+    ticket = relationship("Ticket", back_populates="numbers_list")
+
 class Ticket(Base):
     __tablename__ = "tickets"
     
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    game_id = Column(String, ForeignKey("games.game_id", ondelete="CASCADE"), nullable=False)  # ✅ Mantiene `VARCHAR`
-    user_id = Column(String, ForeignKey("users.telegram_id", ondelete="CASCADE"), nullable=False)  # ✅ Mantiene `VARCHAR`
-    numbers = Column(String, nullable=False)  # Cartella in formato stringa
+    game_id = Column(String, ForeignKey("games.game_id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String, ForeignKey("users.telegram_id", ondelete="CASCADE"), nullable=False)
     purchase_time = Column(DateTime, default=func.now())
 
     game = relationship("Game", back_populates="tickets")
     user = relationship("User", back_populates="tickets")
+    numbers_list = relationship("TicketNumber", back_populates="ticket", cascade="all, delete-orphan")
+
 
 class Transaction(Base):
     __tablename__ = "transactions"
