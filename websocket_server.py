@@ -175,6 +175,7 @@ async def notify_clients():
                         "jackpot": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
                         "giocatori_attivi": len(game_data.get("players", {})),
                         "vincitori": game_data.get("winners", {}),
+                        "prossima_partita": await get_next_game_id(),  # 🔥 Aggiungiamo info sulla prossima partita
                      #   "next_game_time": next_game_time,
                     },
                     "players": game_data["players"]
