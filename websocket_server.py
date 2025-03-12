@@ -47,7 +47,7 @@ async def load_game_state():
             logging.info(f"🎮 Partita attiva trovata: {game.game_id}")
 
             # 🔍 Controlla se tutti i numeri sono stati estratti
-            drawn_numbers = list(map(int, game.drawn_numbers.split(","))) if game.drawn_numbers else []
+            drawn_numbers = game.drawn_numbers.split(",") if game.drawn_numbers else []  # ✅ Mantiene l'ordine di estrazione
             logging.info(f"🔢 Numeri estratti: {len(drawn_numbers)} su 90")
 
             # 🔹 Recupera i biglietti
