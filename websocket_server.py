@@ -152,12 +152,11 @@ async def notify_clients():
 
                 if not game_data or "drawn_numbers" not in game_data:
                     logging.error("❌ Dati di gioco non validi.")
-                    await asyncio.sleep(3)
+                    await asyncio.sleep(5)
                     continue  
-
+                    
                 # ⏳ Imposta il tempo della prossima partita se non esiste
-                next_game_time = game_data.get("next_game_time", int((time.time() + 120) * 1000))
-
+                 #next_game_time = game_data.get("next_game_time", int((time.time() + 120) * 1000))
                 # 📌 Costruisce lo stato attuale del gioco
                 stato_attuale = {
                     "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
@@ -167,7 +166,7 @@ async def notify_clients():
                         "jackpot": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
                         "giocatori_attivi": len(game_data.get("players", {})),
                         "vincitori": game_data.get("winners", {}),
-                        "next_game_time": next_game_time,
+                     #   "next_game_time": next_game_time,
                     },
                     "players": game_data["players"]
                 }
@@ -220,10 +219,6 @@ async def start_server():
 if __name__ == "__main__":
     try:
         asyncio.run(start_server())
-    except Exception as e:
-        logging.error(f"❌ Errore nell'avvio del WebSocket Server: {e}")
-
-        logging.error(f"❌ Errore nell'avvio del WebSocket Server: {e}")
     except Exception as e:
         logging.error(f"❌ Errore nell'avvio del WebSocket Server: {e}")
 
