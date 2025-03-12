@@ -101,55 +101,53 @@ async def save_game_state(state):
             await db.rollback()
 
 # 📌 Gestione delle connessioni WebSocket
+import json
+import logging
+import websockets
+
+connected_clients = set()
+
 async def handler(websocket):
     """Gestisce la connessione WebSocket dei client e trasmette gli aggiornamenti."""
     connected_clients.add(websocket)
     logging.info(f"✅ Nuovo client connesso! Totale: {len(connected_clients)} - {websocket.remote_address}")
 
     try:
-        while True:
+        async for message in websocket:  # 🔹 Nessun timeout, connessione aperta finché il client è connesso
+            logging.info(f"📥 Messaggio ricevuto: {message}")
+
             try:
-                # ⏳ Timeout: Se il client non invia nulla per 30s, viene disconnesso
-                message = await asyncio.wait_for(websocket.recv(), timeout=30)
-                logging.info(f"📥 Messaggio ricevuto: {message}")
+                game_state = json.loads(message)
 
-                try:
-                    game_state = json.loads(message)
+                # 🔄 Salva lo stato del gioco se contiene numeri estratti
+                if "drawn_numbers" in game_state:
+                    await save_game_state(game_state)
+                    logging.info("📌 Stato del gioco aggiornato con nuovi numeri estratti.")
 
-                    # 🔄 Salva lo stato del gioco se contiene numeri estratti
-                    if "drawn_numbers" in game_state:
-                        await save_game_state(game_state)
-                        logging.info("📌 Stato del gioco aggiornato con nuovi numeri estratti.")
+                    # 📢 Trasmette l'aggiornamento a tutti i client connessi
+                    broadcast_message = json.dumps(game_state)
 
-                        # 📢 Trasmette l'aggiornamento a tutti i client connessi
-                        broadcast_message = json.dumps(game_state)
+                    # 🔄 Invia solo ai client ancora attivi
+                    active_clients = {client for client in connected_clients if not client.closed}
+                    for client in active_clients:
+                        await client.send(broadcast_message)
 
-                        # 🔄 Invia solo ai client ancora attivi
-                        active_clients = set()
-                        for client in connected_clients:
-                            if not client.closed:
-                                await client.send(broadcast_message)
-                                active_clients.add(client)
+                    # 🧹 Aggiorna la lista dei client connessi
+                    connected_clients.clear()
+                    connected_clients.update(active_clients)
 
-                        # 🧹 Aggiorna la lista dei client connessi
-                        connected_clients.clear()
-                        connected_clients.update(active_clients)
+            except json.JSONDecodeError:
+                logging.error("❌ Errore: Messaggio non è un JSON valido.")
+                await websocket.send(json.dumps({"error": "Messaggio JSON non valido"}))
 
-                except json.JSONDecodeError:
-                    logging.error("❌ Errore: Messaggio non è un JSON valido.")
-                    await websocket.send(json.dumps({"error": "Messaggio JSON non valido"}))
-
-            except asyncio.TimeoutError:
-                logging.warning(f"⚠️ Timeout: Nessun messaggio ricevuto per 30s, chiudo la connessione con {websocket.remote_address}")
-                break  # Esce dal loop e chiude la connessione
-
-    except websockets.exceptions.ConnectionClosed as e:
-        logging.warning(f"⚠️ Client disconnesso normalmente: {e}")
+    except websockets.exceptions.ConnectionClosed:
+        logging.warning(f"⚠️ Il client {websocket.remote_address} si è disconnesso.")
 
     finally:
-        # Rimuove il client dalla lista
+        # Rimuove il client dalla lista solo quando si disconnette
         connected_clients.discard(websocket)
         logging.info(f"❌ Client rimosso dalla lista. Totale attivi: {len(connected_clients)}")
+
 
 # 📌 Funzione per notificare i client attivi
 async def notify_clients():
