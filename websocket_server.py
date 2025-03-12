@@ -13,13 +13,23 @@ from config import COSTO_CARTELLA
 import traceback  # 🔥 Per log più dettagliati
 import config 
 
-# 📌 Assicura che INFO vada su stdout
+import logging
 import sys
+
+# 📌 Configura il logging correttamente
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.INFO,  # 🔥 Forza il livello su INFO
     format="%(asctime)s - %(levelname)s - %(message)s",
-    stream=sys.stdout  
+    handlers=[
+        logging.StreamHandler(sys.stdout),  # 📤 Manda i log su stdout
+    ]
 )
+
+# 📌 Impedisce a SQLAlchemy e altre librerie di generare log di livello ERROR inutili
+logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
+logging.getLogger("asyncio").setLevel(logging.WARNING)
+logging.getLogger("websockets").setLevel(logging.WARNING)
+
 
 # 📌 Imposta il logging dettagliato
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
