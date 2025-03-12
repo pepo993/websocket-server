@@ -16,8 +16,6 @@ class User(Base):
     total_wins = Column(Integer, default=0)
     date_registered = Column(DateTime, default=func.now())
     wallet_address = Column(String, unique=True, nullable=True)  # ✅ Salva l'indirizzo del wallet TON dell'utente
-
-
     tickets = relationship("Ticket", back_populates="user", cascade="all, delete-orphan")
     transactions = relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
 
@@ -31,16 +29,14 @@ class Game(Base):
     drawn_numbers = Column(String, default="")  # Numeri estratti salvati come stringa
     start_time = Column(DateTime, default=func.now())  # Tempo di inizio della partita
     end_time = Column(DateTime, nullable=True)  # Tempo di fine della partita
-
     tickets = relationship("Ticket", back_populates="game", cascade="all, delete-orphan")
 
 class TicketNumber(Base):
     __tablename__ = "ticket_numbers"
-
+    
     id = Column(Integer, primary_key=True, autoincrement=True)
     ticket_id = Column(Integer, ForeignKey("tickets.id", ondelete="CASCADE"), nullable=False)
     number = Column(Integer, nullable=False)
-
     ticket = relationship("Ticket", back_populates="numbers_list")
 
 class Ticket(Base):
@@ -50,9 +46,6 @@ class Ticket(Base):
     game_id = Column(String, ForeignKey("games.game_id", ondelete="CASCADE"), nullable=False)
     user_id = Column(String, ForeignKey("users.telegram_id", ondelete="CASCADE"), nullable=False)
     purchase_time = Column(DateTime, default=func.now())
-
-    game = relationship("Game", back_populates="tickets")
-    user = relationship("User", back_populates="tickets")
     numbers_list = relationship("TicketNumber", back_populates="ticket", cascade="all, delete-orphan")
 
 
@@ -67,8 +60,4 @@ class Transaction(Base):
     timestamp = Column(DateTime, default=func.now())
     tx_hash = Column(String, unique=True, nullable=True)  # ✅ Hash della transazione TON per tracciabilità
     status = Column(String, default="pending")  # ✅ pending, confirmed, failed, cancelled
-    
-
-
-
     user = relationship("User", back_populates="transactions")
