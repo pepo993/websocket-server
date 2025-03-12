@@ -203,6 +203,18 @@ async def notify_clients():
 
         await asyncio.sleep(2)
 
+# 📌 Funzione per prendere prossimo game id partita
+async def get_next_game_id():
+    """Recupera il prossimo game_id che sarà disponibile per i nuovi acquisti."""
+    async with SessionLocal() as db:
+        try:
+            result = await db.execute(select(Game).filter(Game.active == False).order_by(Game.id.desc()))
+            next_game = result.scalars().first()
+            return next_game.game_id if next_game else "Nessuna partita futura"
+        except Exception as e:
+            logging.error(f"❌ Errore in get_next_game_id: {e}", exc_info=True)
+            return "Errore nel recupero"
+
 # 📌 Health Check per Railway
 async def health_check(request):
     return web.Response(text="OK", status=200)
