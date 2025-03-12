@@ -71,7 +71,7 @@ async def load_game_state():
 
                     players[ticket.user_id]["cartelle"].append(ticket_numbers)  # ✅ Ora i numeri sono caricati correttamente!
 
-                logging.info(f"👥 Giocatori trovati: {len(players)}")
+                    logging.info(f"👥 Giocatori trovati: {len(players)}")
 
                 return {
                     "drawn_numbers": list(map(int, game.drawn_numbers.split(","))) if game.drawn_numbers else [],
