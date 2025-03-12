@@ -80,10 +80,11 @@ async def save_game_state(state):
     async with SessionLocal() as db:
         try:
             logging.info("💾 Tentativo di salvataggio dello stato del gioco...")
-            
+
             # 🔹 Recupera la partita attiva forzando il refresh della cache
             result = await db.execute(select(Game).filter(Game.active == True).execution_options(synchronize_session=False))
             game = result.scalars().first()
+
             if game:
                 logging.info(f"📝 DEBUG: Salvataggio numeri estratti: {state['drawn_numbers']}")
 
@@ -101,8 +102,10 @@ async def save_game_state(state):
 
 # 📌 Gestione delle connessioni WebSocket
 ultimo_numero_estratto = None  # Memorizza l'ultimo numero notificato
+numeri_gia_inviati = set()  # Memorizza tutti i numeri già inviati ai client
+
 async def handler(websocket):
-    global ultimo_numero_estratto
+    global ultimo_numero_estratto, numeri_gia_inviati
     connected_clients.add(websocket)
     logging.info(f"✅ Nuovo client connesso! Totale: {len(connected_clients)} - {websocket.remote_address}")
 
@@ -115,11 +118,11 @@ async def handler(websocket):
                 numero_estratto = game_state.get("numero_estratto")
 
                 # 🔹 Blocca aggiornamenti duplicati
-                if numero_estratto == ultimo_numero_estratto:
+                if numero_estratto in numeri_gia_inviati:
                     logging.warning(f"⚠️ Numero {numero_estratto} già notificato, evitando duplicato")
                     continue
 
-                ultimo_numero_estratto = numero_estratto  # ✅ Memorizza l'ultimo numero
+                numeri_gia_inviati.add(numero_estratto)  # ✅ Memorizza il numero estratto
 
                 if "drawn_numbers" in game_state:
                     await save_game_state(game_state)
