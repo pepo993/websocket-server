@@ -116,6 +116,7 @@ async def handler(websocket):
                     continue
 
                 ultimo_numero_estratto = numero_estratto  # ✅ Memorizza l'ultimo numero
+                await websocket.send(json.dumps({"ack": numero_estratto}))
 
                 if "drawn_numbers" in game_state:
                     await save_game_state(game_state)
@@ -161,8 +162,44 @@ async def notify_clients():
                     await asyncio.sleep(3)
                     continue  
 
-                # ⏳ Imposta il tempo della prossima partita se non esiste
-                next_game_time = game_data.get("next_game_time", int((time.time() + 120) * 1000))
+                # ⏳ Recupera l'ultimo numero estratto
+                ultimo_numero = game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None
+
+                # 📌 Costruisce lo stato attuale del gioco
+                stato_attuale = {
+                    "numero_estratto": ultimo_numero,
+                    "numeri_estratti": game_data["drawn_numbers"],
+                    "game_status": {
+                        "cartelle_vendute": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()),
+                        "jackpot": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
+                        "giocatori_attivi": len(game_data.get("players", {})),
+                        "vincitori": game_data.get("winners", {}),
+                        "next_game_time": int((time.time() + 120) * 1000),
+                    },
+                    "players": game_data["players"]
+                }
+
+                # 📤 Invia solo se il numero estratto è cambiato
+                if stato_attuale["numero_estratto"] != ultimo_numero_estratto:
+                    ultimo_numero_estratto = stato_attuale["numero_estratto"]  # 🔥 Aggiorna memoria locale
+                    message = json.dumps(stato_attuale)
+
+                    disconnected_clients = set()
+                    for client in connected_clients:
+                        try:
+                            await client.send(message)
+                        except websockets.exceptions.ConnectionClosed:
+                            disconnected_clients.add(client)
+
+                    for client in disconnected_clients:
+                        connected_clients.discard(client)
+
+                    logging.info(f"📤 Stato aggiornato inviato ai client: {message}")
+
+            except Exception as e:
+                logging.error(f"❌ Errore in notify_clients: {e}")
+
+        await asyncio.sleep(2)
 
                 # 📌 Costruisce lo stato attuale del gioco
                 stato_attuale = {
