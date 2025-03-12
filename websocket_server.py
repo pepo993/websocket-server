@@ -13,11 +13,16 @@ from config import COSTO_CARTELLA
 import traceback  # 🔥 Per log più dettagliati
 import config 
 
-# 📌 Imposta il logging dettagliato
+# 📌 Assicura che INFO vada su stdout
 import sys
-logging.basicConfig( level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s",
-stream=sys.stdout  #  Assicura che INFO vada su stdout
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    stream=sys.stdout  
 )
+
+# 📌 Imposta il logging dettagliato
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # 📌 Porta assegnata per Railway (default: 8002)
 PORT = int(os.getenv("PORT", 8002))
@@ -85,17 +90,9 @@ async def save_game_state(state):
             game = result.scalars().first()
 
             if game:
-                # ✅ Controlla se il numero è già stato registrato
-                nuovi_numeri = set(map(int, state["drawn_numbers"]))
-                numeri_già_salvati = set(map(int, game.drawn_numbers.split(","))) if game.drawn_numbers else set()
-
-                if nuovi_numeri != numeri_già_salvati:
-                    game.drawn_numbers = ",".join(map(str, sorted(nuovi_numeri)))  # Mantiene ordine e consistenza
-                    await db.commit()
-                    logging.info(f"✅ Stato del gioco aggiornato con {len(nuovi_numeri)} numeri.")
-                else:
-                    logging.info("⚠️ Nessun nuovo numero da salvare. Salvataggio evitato.")
-
+                game.drawn_numbers = ",".join(map(str, state["drawn_numbers"]))
+                await db.commit()
+                logging.info("✅ Stato del gioco aggiornato nel database.")
             else:
                 logging.warning("⚠️ Nessuna partita attiva trovata per il salvataggio.")
         except Exception as e:
@@ -103,11 +100,8 @@ async def save_game_state(state):
             logging.error(traceback.format_exc())  # 🔥 Stack trace completo
             await db.rollback()
 
-
 # 📌 Gestione delle connessioni WebSocket
-ultimo_numero_estratto = None  # Memorizza l'ultimo numero notificato
 async def handler(websocket):
-    global ultimo_numero_estratto
     connected_clients.add(websocket)
     logging.info(f"✅ Nuovo client connesso! Totale: {len(connected_clients)} - {websocket.remote_address}")
 
@@ -117,15 +111,6 @@ async def handler(websocket):
 
             try:
                 game_state = json.loads(message)
-                numero_estratto = game_state.get("numero_estratto")
-
-                # 🔹 Blocca aggiornamenti duplicati
-                if numero_estratto == ultimo_numero_estratto:
-                    logging.warning(f"⚠️ Numero {numero_estratto} già notificato, evitando duplicato")
-                    continue
-
-                ultimo_numero_estratto = numero_estratto  # ✅ Memorizza l'ultimo numero
-
                 if "drawn_numbers" in game_state:
                     await save_game_state(game_state)
                     logging.info("📌 Stato del gioco aggiornato con nuovi numeri estratti.")
@@ -157,39 +142,39 @@ async def handler(websocket):
 
 # 📌 Funzione per notificare i client attivi
 async def notify_clients():
-    global ultimo_stato_trasmesso, ultimo_numero_estratto
+    global ultimo_stato_trasmesso
 
     while True:
         if connected_clients:
             try:
                 game_data = await load_game_state()
-                await asyncio.sleep(1.5)
+                await asyncio.sleep(3)
 
                 if not game_data or "drawn_numbers" not in game_data:
                     logging.error("❌ Dati di gioco non validi.")
                     await asyncio.sleep(3)
                     continue  
 
-                # ⏳ Recupera l'ultimo numero estratto
-                ultimo_numero = game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None
+                # ⏳ Imposta il tempo della prossima partita se non esiste
+                next_game_time = game_data.get("next_game_time", int((time.time() + 120) * 1000))
 
                 # 📌 Costruisce lo stato attuale del gioco
                 stato_attuale = {
-                    "numero_estratto": ultimo_numero,
+                    "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
                     "numeri_estratti": game_data["drawn_numbers"],
                     "game_status": {
                         "cartelle_vendute": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()),
                         "jackpot": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
                         "giocatori_attivi": len(game_data.get("players", {})),
                         "vincitori": game_data.get("winners", {}),
-                        "next_game_time": int((time.time() + 120) * 1000),
+                        "next_game_time": next_game_time,
                     },
                     "players": game_data["players"]
                 }
 
-                # 📤 Invia solo se il numero estratto è cambiato
-                if ultimo_numero != ultimo_numero_estratto:
-                    ultimo_numero_estratto = ultimo_numero  # 🔥 Aggiorna memoria locale
+                # 📤 Invia solo se lo stato è cambiato
+                if stato_attuale != ultimo_stato_trasmesso:
+                    ultimo_stato_trasmesso = stato_attuale
                     message = json.dumps(stato_attuale)
 
                     disconnected_clients = set()
@@ -202,9 +187,7 @@ async def notify_clients():
                     for client in disconnected_clients:
                         connected_clients.discard(client)
 
-                    logging.info(f"📤 Stato aggiornato inviato ai client: {message}")
-                else:
-                    logging.info(f"⚠️ Nessun nuovo numero estratto. Non invio dati ai client.")
+                    logging.info(f"📤 Dati inviati ai client WebSocket: {message}")
 
             except Exception as e:
                 logging.error(f"❌ Errore in notify_clients: {e}")
