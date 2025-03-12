@@ -80,19 +80,23 @@ async def save_game_state(state):
     async with SessionLocal() as db:
         try:
             logging.info("💾 Tentativo di salvataggio dello stato del gioco...")
-
-            result = await db.execute(select(Game).filter(Game.active == True))
+            
+            # 🔹 Recupera la partita attiva forzando il refresh della cache
+            result = await db.execute(select(Game).filter(Game.active == True).execution_options(synchronize_session=False))
             game = result.scalars().first()
-
             if game:
-                game.drawn_numbers = ",".join(map(str, state["drawn_numbers"]))
+                logging.info(f"📝 DEBUG: Salvataggio numeri estratti: {state['drawn_numbers']}")
+
+                drawn_numbers = state.get("drawn_numbers", [])
+                game.drawn_numbers = ",".join(map(str, drawn_numbers)) if drawn_numbers else ""
+
                 await db.commit()
                 logging.info("✅ Stato del gioco aggiornato nel database.")
             else:
                 logging.warning("⚠️ Nessuna partita attiva trovata per il salvataggio.")
         except Exception as e:
             logging.error(f"❌ Errore nel salvataggio dello stato del gioco: {e}")
-            logging.error(traceback.format_exc())  # 🔥 Stack trace completo
+            logging.error(traceback.format_exc())
             await db.rollback()
 
 # 📌 Gestione delle connessioni WebSocket
