@@ -152,11 +152,8 @@ async def notify_clients():
 
                 if not game_data or "drawn_numbers" not in game_data:
                     logging.error("❌ Dati di gioco non validi.")
-                    await asyncio.sleep(3)
+                    await asyncio.sleep(5)
                     continue  
-
-                # ⏳ Imposta il tempo della prossima partita se non esiste
-                next_game_time = game_data.get("next_game_time", int((time.time() + 120) * 1000))
 
                 # 📌 Costruisce lo stato attuale del gioco
                 stato_attuale = {
