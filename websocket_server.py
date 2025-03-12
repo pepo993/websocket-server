@@ -12,22 +12,14 @@ from models import Game, Ticket
 from config import COSTO_CARTELLA
 import traceback  # 🔥 Per log più dettagliati
 import config 
+
+# 📌 Assicura che INFO vada su stdout
 import sys
-
-# 📌 Configura il logging correttamente
 logging.basicConfig(
-    level=logging.INFO,  # 🔥 Forza il livello su INFO
+    level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),  # 📤 Manda i log su stdout
-    ]
+    stream=sys.stdout  
 )
-
-# 📌 Impedisce a SQLAlchemy e altre librerie di generare log di livello ERROR inutili
-logging.getLogger("sqlalchemy.engine").setLevel(logging.WARNING)
-logging.getLogger("asyncio").setLevel(logging.WARNING)
-logging.getLogger("websockets").setLevel(logging.WARNING)
-
 
 # 📌 Imposta il logging dettagliato
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -98,22 +90,14 @@ async def save_game_state(state):
             game = result.scalars().first()
 
             if game:
-                # ✅ Mantieni l'ordine originale di estrazione senza riordinare
-                numeri_già_salvati = game.drawn_numbers.split(",") if game.drawn_numbers else []
-                
-                for num in state["drawn_numbers"]:
-                    if str(num) not in numeri_già_salvati:
-                        numeri_già_salvati.append(str(num))  # ✅ Aggiunto senza riordinare
-
-                game.drawn_numbers = ",".join(numeri_già_salvati)  # Mantiene ordine originale
+                game.drawn_numbers = ",".join(map(str, state["drawn_numbers"]))
                 await db.commit()
-                logging.info(f"✅ Stato del gioco aggiornato con {len(numeri_già_salvati)} numeri.")
-
+                logging.info("✅ Stato del gioco aggiornato nel database.")
             else:
                 logging.warning("⚠️ Nessuna partita attiva trovata per il salvataggio.")
         except Exception as e:
             logging.error(f"❌ Errore nel salvataggio dello stato del gioco: {e}")
-            logging.error(traceback.format_exc())
+            logging.error(traceback.format_exc())  # 🔥 Stack trace completo
             await db.rollback()
 
 # 📌 Gestione delle connessioni WebSocket
@@ -164,7 +148,7 @@ async def notify_clients():
         if connected_clients:
             try:
                 game_data = await load_game_state()
-                await asyncio.sleep(3)
+                await asyncio.sleep(1.5)
 
                 if not game_data or "drawn_numbers" not in game_data:
                     logging.error("❌ Dati di gioco non validi.")
