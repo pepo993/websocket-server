@@ -53,9 +53,11 @@ class Transaction(Base):
     user_id = Column(String, ForeignKey("users.telegram_id", ondelete="CASCADE"), nullable=False)  # ✅ Mantiene `VARCHAR`
     transaction_type = Column(String, nullable=False)  # deposit, withdraw, win
     amount = Column(Float, nullable=False)
+    system_fees = Column(Float, default=0.0)  # ✅ Traccia la quota trattenuta dal sistema
     timestamp = Column(DateTime, default=func.now())
     tx_hash = Column(String, unique=True, nullable=True)  # ✅ Hash della transazione TON per tracciabilità
     status = Column(String, default="pending")  # ✅ pending, confirmed, failed, cancelled
+    
 
 
 
