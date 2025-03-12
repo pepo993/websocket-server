@@ -159,7 +159,6 @@ async def notify_clients():
                  #next_game_time = game_data.get("next_game_time", int((time.time() + 120) * 1000))
                 # 📌 Costruisce lo stato attuale del gioco
                 stato_attuale = {
-                    "game_id": game_data["game_id"], 
                     "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
                     "numeri_estratti": game_data["drawn_numbers"],
                     "game_status": {
