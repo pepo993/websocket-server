@@ -47,7 +47,7 @@ async def load_game_state():
             logging.info(f"🎮 Partita attiva trovata: {game.game_id}")
 
             # 🔍 Controlla se tutti i numeri sono stati estratti
-            drawn_numbers = game.drawn_numbers.split(",") if game.drawn_numbers else []  # ✅ Mantiene l'ordine di estrazione
+            drawn_numbers = list(map(int, game.drawn_numbers.split(","))) if game.drawn_numbers else []
             logging.info(f"🔢 Numeri estratti: {len(drawn_numbers)} su 90")
 
             # 🔹 Recupera i biglietti
@@ -148,7 +148,7 @@ async def notify_clients():
         if connected_clients:
             try:
                 game_data = await load_game_state()
-                await asyncio.sleep(3)
+                await asyncio.sleep(1.5)
 
                 if not game_data or "drawn_numbers" not in game_data:
                     logging.error("❌ Dati di gioco non validi.")
