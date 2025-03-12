@@ -201,7 +201,18 @@ async def notify_clients():
 
 # 📌 Health Check per Railway
 async def health_check(request):
-    return web.Response(text="OK", status=200)
+    """Testa la connessione al database e il numero di client attivi."""
+    async with SessionLocal() as db:
+        try:
+            await db.execute(select(1))  # Query di test
+            db_status = "🟢 Database OK"
+        except:
+            db_status = "🔴 Errore Database"
+
+    ws_status = f"🟢 Client attivi: {len(connected_clients)}" if connected_clients else "🟡 Nessun client connesso"
+
+    return web.Response(text=f"{db_status}\n{ws_status}", status=200)
+
 
 # 📌 Configura il server HTTP per l'health check
 app = web.Application()
