@@ -15,6 +15,8 @@ class User(Base):
     games_played = Column(Integer, default=0)
     total_wins = Column(Integer, default=0)
     date_registered = Column(DateTime, default=func.now())
+    wallet_address = Column(String, unique=True, nullable=True)  # ✅ Salva l'indirizzo del wallet TON dell'utente
+
 
     tickets = relationship("Ticket", back_populates="user", cascade="all, delete-orphan")
     transactions = relationship("Transaction", back_populates="user", cascade="all, delete-orphan")
@@ -52,5 +54,9 @@ class Transaction(Base):
     transaction_type = Column(String, nullable=False)  # deposit, withdraw, win
     amount = Column(Float, nullable=False)
     timestamp = Column(DateTime, default=func.now())
+    tx_hash = Column(String, unique=True, nullable=True)  # ✅ Hash della transazione TON per tracciabilità
+    status = Column(String, default="pending")  # ✅ pending, confirmed, failed, cancelled
+
+
 
     user = relationship("User", back_populates="transactions")
