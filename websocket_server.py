@@ -193,5 +193,3 @@ if __name__ == "__main__":
         asyncio.run(start_server())
     except Exception as e:
         logging.error(f"❌ Errore nell'avvio del WebSocket Server: {e}")
-
-        logging.error(f"❌ Errore nell'avvio del WebSocket Server: {e}")
