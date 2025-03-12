@@ -102,41 +102,52 @@ async def save_game_state(state):
 
 # 📌 Gestione delle connessioni WebSocket
 async def handler(websocket):
+    """Gestisce la connessione WebSocket dei client e trasmette gli aggiornamenti."""
     connected_clients.add(websocket)
     logging.info(f"✅ Nuovo client connesso! Totale: {len(connected_clients)} - {websocket.remote_address}")
 
     try:
-        async for message in websocket:
-            logging.info(f"📥 Messaggio ricevuto: {message}")
-
+        while True:
             try:
-                game_state = json.loads(message)
-                if "drawn_numbers" in game_state:
-                    await save_game_state(game_state)
-                    logging.info("📌 Stato del gioco aggiornato con nuovi numeri estratti.")
+                # ⏳ Timeout: Se il client non invia nulla per 30s, viene disconnesso
+                message = await asyncio.wait_for(websocket.recv(), timeout=30)
+                logging.info(f"📥 Messaggio ricevuto: {message}")
 
-                    # 📢 Invia l'aggiornamento a tutti i client connessi
-                    broadcast_message = json.dumps(game_state)
-                    disconnected_clients = set()
+                try:
+                    game_state = json.loads(message)
 
-                    for client in connected_clients:
-                        try:
-                            await client.send(broadcast_message)
-                        except websockets.exceptions.ConnectionClosed:
-                            disconnected_clients.add(client)
+                    # 🔄 Salva lo stato del gioco se contiene numeri estratti
+                    if "drawn_numbers" in game_state:
+                        await save_game_state(game_state)
+                        logging.info("📌 Stato del gioco aggiornato con nuovi numeri estratti.")
 
-                    # Rimuove i client disconnessi
-                    for client in disconnected_clients:
-                        connected_clients.discard(client)
-                        logging.info(f"❌ Client disconnesso rimosso. Totale attivi: {len(connected_clients)}")
+                        # 📢 Trasmette l'aggiornamento a tutti i client connessi
+                        broadcast_message = json.dumps(game_state)
 
-            except json.JSONDecodeError:
-                logging.error("❌ Errore: Messaggio non è un JSON valido.")
+                        # 🔄 Invia solo ai client ancora attivi
+                        active_clients = set()
+                        for client in connected_clients:
+                            if not client.closed:
+                                await client.send(broadcast_message)
+                                active_clients.add(client)
+
+                        # 🧹 Aggiorna la lista dei client connessi
+                        connected_clients.clear()
+                        connected_clients.update(active_clients)
+
+                except json.JSONDecodeError:
+                    logging.error("❌ Errore: Messaggio non è un JSON valido.")
+                    await websocket.send(json.dumps({"error": "Messaggio JSON non valido"}))
+
+            except asyncio.TimeoutError:
+                logging.warning(f"⚠️ Timeout: Nessun messaggio ricevuto per 30s, chiudo la connessione con {websocket.remote_address}")
+                break  # Esce dal loop e chiude la connessione
 
     except websockets.exceptions.ConnectionClosed as e:
         logging.warning(f"⚠️ Client disconnesso normalmente: {e}")
 
     finally:
+        # Rimuove il client dalla lista
         connected_clients.discard(websocket)
         logging.info(f"❌ Client rimosso dalla lista. Totale attivi: {len(connected_clients)}")
 
