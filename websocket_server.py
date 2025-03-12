@@ -159,6 +159,8 @@ async def handler(websocket):
         logging.info(f"❌ Client rimosso dalla lista. Totale attivi: {len(connected_clients)}")
 
 # 📌 Funzione per notificare i client attivi
+ultimo_numero_estratto = None  # 🔥 Definisce la variabile globale per il numero estratto
+
 async def notify_clients():
     global ultimo_stato_trasmesso, ultimo_numero_estratto
 
