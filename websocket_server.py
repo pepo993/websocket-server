@@ -96,7 +96,9 @@ async def save_game_state(state):
             await db.rollback()
 
 # 📌 Gestione delle connessioni WebSocket
+ultimo_numero_estratto = None  # Memorizza l'ultimo numero notificato
 async def handler(websocket):
+    global ultimo_numero_estratto
     connected_clients.add(websocket)
     logging.info(f"✅ Nuovo client connesso! Totale: {len(connected_clients)} - {websocket.remote_address}")
 
@@ -106,6 +108,15 @@ async def handler(websocket):
 
             try:
                 game_state = json.loads(message)
+                numero_estratto = game_state.get("numero_estratto")
+
+                # 🔹 Blocca aggiornamenti duplicati
+                if numero_estratto == ultimo_numero_estratto:
+                    logging.warning(f"⚠️ Numero {numero_estratto} già notificato, evitando duplicato")
+                    continue
+
+                ultimo_numero_estratto = numero_estratto  # ✅ Memorizza l'ultimo numero
+
                 if "drawn_numbers" in game_state:
                     await save_game_state(game_state)
                     logging.info("📌 Stato del gioco aggiornato con nuovi numeri estratti.")
