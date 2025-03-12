@@ -116,7 +116,6 @@ async def handler(websocket):
                     continue
 
                 ultimo_numero_estratto = numero_estratto  # ✅ Memorizza l'ultimo numero
-                await websocket.send(json.dumps({"ack": numero_estratto}))
 
                 if "drawn_numbers" in game_state:
                     await save_game_state(game_state)
@@ -162,26 +161,26 @@ async def notify_clients():
                     await asyncio.sleep(3)
                     continue  
 
-                # ⏳ Recupera l'ultimo numero estratto
-                ultimo_numero = game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None
+                # ⏳ Imposta il tempo della prossima partita se non esiste
+                next_game_time = game_data.get("next_game_time", int((time.time() + 120) * 1000))
 
                 # 📌 Costruisce lo stato attuale del gioco
                 stato_attuale = {
-                    "numero_estratto": ultimo_numero,
+                    "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
                     "numeri_estratti": game_data["drawn_numbers"],
                     "game_status": {
                         "cartelle_vendute": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()),
                         "jackpot": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
                         "giocatori_attivi": len(game_data.get("players", {})),
                         "vincitori": game_data.get("winners", {}),
-                        "next_game_time": int((time.time() + 120) * 1000),
+                        "next_game_time": next_game_time,
                     },
                     "players": game_data["players"]
                 }
 
-                # 📤 Invia solo se il numero estratto è cambiato
-                if stato_attuale["numero_estratto"] != ultimo_numero_estratto:
-                    ultimo_numero_estratto = stato_attuale["numero_estratto"]  # 🔥 Aggiorna memoria locale
+                # 📤 Invia solo se lo stato è cambiato
+                if stato_attuale != ultimo_stato_trasmesso:
+                    ultimo_stato_trasmesso = stato_attuale
                     message = json.dumps(stato_attuale)
 
                     disconnected_clients = set()
@@ -194,7 +193,7 @@ async def notify_clients():
                     for client in disconnected_clients:
                         connected_clients.discard(client)
 
-                    logging.info(f"📤 Stato aggiornato inviato ai client: {message}")
+                    logging.info(f"📤 Dati inviati ai client WebSocket: {message}")
 
             except Exception as e:
                 logging.error(f"❌ Errore in notify_clients: {e}")
