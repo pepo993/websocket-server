@@ -65,7 +65,24 @@ async def load_game_state():
                 if ticket.user_id not in players:
                     players[ticket.user_id] = {"cartelle": []}
                 try:
-                    players[ticket.user_id]["cartelle"].append(json.loads(ticket.numbers))  # ✅ Fix JSON
+                    # 📌 Recupera i numeri di ogni cartella da `ticket_numbers`
+                    result = await db.execute(select(TicketNumber.number).filter(TicketNumber.ticket_id == ticket.id))
+                    ticket_numbers = [row[0] for row in result.all()]  # Estrai solo i numeri
+
+                    players[ticket.user_id]["cartelle"].append(ticket_numbers)  # ✅ Ora i numeri sono caricati correttamente!
+
+                logging.info(f"👥 Giocatori trovati: {len(players)}")
+
+                return {
+                    "drawn_numbers": list(map(int, game.drawn_numbers.split(","))) if game.drawn_numbers else [],
+                    "players": players,
+                    "winners": {}
+                }
+
+            except Exception as e:
+                logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
+                return {"drawn_numbers": [], "players": {}, "winners": {}}
+
                 except json.JSONDecodeError:
                     logging.error(f"❌ Errore nel parsing JSON per il ticket di {ticket.user_id}")
 
