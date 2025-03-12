@@ -47,6 +47,8 @@ class Ticket(Base):
     user_id = Column(String, ForeignKey("users.telegram_id", ondelete="CASCADE"), nullable=False)
     purchase_time = Column(DateTime, default=func.now())
     numbers_list = relationship("TicketNumber", back_populates="ticket", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="tickets")
+
 
 
 class Transaction(Base):
