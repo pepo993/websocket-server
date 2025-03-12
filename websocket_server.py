@@ -12,8 +12,6 @@ from models import Game, Ticket
 from config import COSTO_CARTELLA
 import traceback  # 🔥 Per log più dettagliati
 import config 
-
-import logging
 import sys
 
 # 📌 Configura il logging correttamente
