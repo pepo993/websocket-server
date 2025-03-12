@@ -163,9 +163,7 @@ async def notify_clients():
                     logging.error("❌ Dati di gioco non validi.")
                     await asyncio.sleep(5)
                     continue  
-                    
-                # ⏳ Imposta il tempo della prossima partita se non esiste
-                 #next_game_time = game_data.get("next_game_time", int((time.time() + 120) * 1000))
+
                 # 📌 Costruisce lo stato attuale del gioco
                 stato_attuale = {
                     "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
@@ -175,8 +173,6 @@ async def notify_clients():
                         "jackpot": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
                         "giocatori_attivi": len(game_data.get("players", {})),
                         "vincitori": game_data.get("winners", {}),
-                        "prossima_partita": await get_next_game_id(),  # 🔥 Aggiungiamo info sulla prossima partita
-                     #   "next_game_time": next_game_time,
                     },
                     "players": game_data["players"]
                 }
@@ -202,18 +198,6 @@ async def notify_clients():
                 logging.error(f"❌ Errore in notify_clients: {e}")
 
         await asyncio.sleep(2)
-
-# 📌 Funzione per prendere prossimo game id partita
-async def get_next_game_id():
-    """Recupera il prossimo game_id che sarà disponibile per i nuovi acquisti."""
-    async with SessionLocal() as db:
-        try:
-            result = await db.execute(select(Game).filter(Game.active == False).order_by(Game.id.desc()))
-            next_game = result.scalars().first()
-            return next_game.game_id if next_game else "Nessuna partita futura"
-        except Exception as e:
-            logging.error(f"❌ Errore in get_next_game_id: {e}", exc_info=True)
-            return "Errore nel recupero"
 
 # 📌 Health Check per Railway
 async def health_check(request):
