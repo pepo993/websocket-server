@@ -157,7 +157,7 @@ async def handler(websocket):
 
 # 📌 Funzione per notificare i client attivi
 async def notify_clients():
-    global ultimo_stato_trasmesso
+    global ultimo_stato_trasmesso, ultimo_numero_estratto
 
     while True:
         if connected_clients:
@@ -170,26 +170,26 @@ async def notify_clients():
                     await asyncio.sleep(3)
                     continue  
 
-                # ⏳ Imposta il tempo della prossima partita se non esiste
-                next_game_time = game_data.get("next_game_time", int((time.time() + 120) * 1000))
+                # ⏳ Recupera l'ultimo numero estratto
+                ultimo_numero = game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None
 
                 # 📌 Costruisce lo stato attuale del gioco
                 stato_attuale = {
-                    "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
+                    "numero_estratto": ultimo_numero,
                     "numeri_estratti": game_data["drawn_numbers"],
                     "game_status": {
                         "cartelle_vendute": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()),
                         "jackpot": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
                         "giocatori_attivi": len(game_data.get("players", {})),
                         "vincitori": game_data.get("winners", {}),
-                        "next_game_time": next_game_time,
+                        "next_game_time": int((time.time() + 120) * 1000),
                     },
                     "players": game_data["players"]
                 }
 
-                # 📤 Invia solo se lo stato è cambiato
-                if stato_attuale != ultimo_stato_trasmesso:
-                    ultimo_stato_trasmesso = stato_attuale
+                # 📤 Invia solo se il numero estratto è cambiato
+                if ultimo_numero != ultimo_numero_estratto:
+                    ultimo_numero_estratto = ultimo_numero  # 🔥 Aggiorna memoria locale
                     message = json.dumps(stato_attuale)
 
                     disconnected_clients = set()
@@ -202,7 +202,9 @@ async def notify_clients():
                     for client in disconnected_clients:
                         connected_clients.discard(client)
 
-                    logging.info(f"📤 Dati inviati ai client WebSocket: {message}")
+                    logging.info(f"📤 Stato aggiornato inviato ai client: {message}")
+                else:
+                    logging.info(f"⚠️ Nessun nuovo numero estratto. Non invio dati ai client.")
 
             except Exception as e:
                 logging.error(f"❌ Errore in notify_clients: {e}")
