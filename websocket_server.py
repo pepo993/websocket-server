@@ -98,15 +98,24 @@ async def save_game_state(state):
             game = result.scalars().first()
 
             if game:
-                game.drawn_numbers = ",".join(map(str, state["drawn_numbers"]))
-                await db.commit()
-                logging.info("✅ Stato del gioco aggiornato nel database.")
+                # ✅ Mantieni l'ordine di estrazione senza riordinare
+                numeri_già_salvati = game.drawn_numbers.split(",") if game.drawn_numbers else []
+                nuovi_numeri = [str(num) for num in state["drawn_numbers"] if str(num) not in numeri_già_salvati]
+
+                if nuovi_numeri:
+                    game.drawn_numbers = ",".join(numeri_già_salvati + nuovi_numeri)  # Mantieni ordine originale
+                    await db.commit()
+                    logging.info(f"✅ Stato del gioco aggiornato con {len(nuovi_numeri)} nuovi numeri.")
+                else:
+                    logging.info("⚠️ Nessun nuovo numero da salvare. Salvataggio evitato.")
+
             else:
                 logging.warning("⚠️ Nessuna partita attiva trovata per il salvataggio.")
         except Exception as e:
             logging.error(f"❌ Errore nel salvataggio dello stato del gioco: {e}")
             logging.error(traceback.format_exc())  # 🔥 Stack trace completo
             await db.rollback()
+
 
 # 📌 Gestione delle connessioni WebSocket
 async def handler(websocket):
