@@ -227,6 +227,7 @@ async def start_server():
     site = web.TCPSite(runner, "0.0.0.0", 8080)
     await site.start()
     logging.info("✅ Health check attivo su http://0.0.0.0:8080/health")
+
     await asyncio.gather(websocket_server.wait_closed(), notify_clients())
 
 # 📌 Avvio del server
