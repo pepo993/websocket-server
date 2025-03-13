@@ -42,7 +42,6 @@ class Ticket(Base):
     numbers = Column(String, nullable=False)  # ✅ Aggiungiamo di nuovo `numbers` per salvare la cartella in JSON
     purchase_time = Column(DateTime, default=func.now())  
     
-    numbers_list = relationship("TicketNumber", back_populates="ticket", cascade="all, delete-orphan")
     user = relationship("User", back_populates="tickets")
     game = relationship("Game", back_populates="tickets")  # ✅ AGGIUNTA RELAZIONE
 
