@@ -9,8 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from database import SessionLocal
 from models import Game, Ticket, TicketNumber
-
-from config import COSTO_CARTELLA
 import traceback  # 🔥 Per log più dettagliati
 import config 
 
@@ -52,21 +50,22 @@ async def load_game_state():
             logging.info(f"🔢 Numeri estratti: {len(drawn_numbers)} su 90")
 
             # 🔹 Recupera i biglietti
-            result = await db.execute(select(Ticket).filter(Ticket.game_id == game.game_id))
-            tickets = result.scalars().all()
-            logging.info(f"🎟️ Biglietti trovati: {len(tickets)}")
+            try:
+                result = await db.execute(select(Ticket).filter(Ticket.game_id == game.game_id))
+                tickets = result.scalars().all()
+                logging.info(f"🎟️ Biglietti trovati: {len(tickets)}")
+            except Exception as e:
+                logging.error(f"❌ Errore nel recupero dei ticket: {e}")
+                return {"drawn_numbers": drawn_numbers, "players": {}, "winners": {}}
 
             players = {}
-
             for ticket in tickets:
                 if ticket.user_id not in players:
                     players[ticket.user_id] = {"cartelle": []}
-
-                # 📌 Recupera i numeri della cartella dal database
-                result = await db.execute(select(TicketNumber.number).filter(TicketNumber.ticket_id == ticket.id))
-                ticket_numbers = [row[0] for row in result.all()]  # Estrai solo i numeri
-
-                players[ticket.user_id]["cartelle"].append(ticket_numbers)  # ✅ Ora i numeri sono caricati correttamente!
+                try:
+                    players[ticket.user_id]["cartelle"].append(json.loads(ticket.numbers))  # ✅ Fix JSON
+                except json.JSONDecodeError:
+                    logging.error(f"❌ Errore nel parsing JSON per il ticket di {ticket.user_id}")
 
             logging.info(f"👥 Giocatori trovati: {len(players)}")
 
@@ -75,61 +74,10 @@ async def load_game_state():
                 "players": players,
                 "winners": {}
             }
-
         except Exception as e:
             logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
             logging.error(traceback.format_exc())
             return {"drawn_numbers": [], "players": {}, "winners": {}}
-from models import Ticket, TicketNumber  # ✅ Assicurati di importare TicketNumber
-
-async def load_game_state():
-    async with SessionLocal() as db:
-        try:
-            logging.info("🔄 Caricamento stato del gioco dal database...")
-
-            result = await db.execute(select(Game).filter(Game.active == True))
-            game = result.scalars().first()
-
-            if not game:
-                logging.warning("⚠️ Nessuna partita attiva trovata.")
-                return {"drawn_numbers": [], "players": {}, "winners": {}}
-
-            logging.info(f"🎮 Partita attiva trovata: {game.game_id}")
-
-            # 🔍 Controlla se tutti i numeri sono stati estratti
-            drawn_numbers = list(map(int, game.drawn_numbers.split(","))) if game.drawn_numbers else []
-            logging.info(f"🔢 Numeri estratti: {len(drawn_numbers)} su 90")
-
-            # 🔹 Recupera i biglietti
-            result = await db.execute(select(Ticket).filter(Ticket.game_id == game.game_id))
-            tickets = result.scalars().all()
-            logging.info(f"🎟️ Biglietti trovati: {len(tickets)}")
-
-            players = {}
-
-            for ticket in tickets:
-                if ticket.user_id not in players:
-                    players[ticket.user_id] = {"cartelle": []}
-
-                # 📌 Recupera i numeri della cartella dal database
-                result = await db.execute(select(TicketNumber.number).filter(TicketNumber.ticket_id == ticket.id))
-                ticket_numbers = [row[0] for row in result.all()]  # Estrai solo i numeri
-
-                players[ticket.user_id]["cartelle"].append(ticket_numbers)  # ✅ Ora i numeri sono caricati correttamente!
-
-            logging.info(f"👥 Giocatori trovati: {len(players)}")
-
-            return {
-                "drawn_numbers": drawn_numbers,
-                "players": players,
-                "winners": {}
-            }
-
-        except Exception as e:
-            logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
-            logging.error(traceback.format_exc())
-            return {"drawn_numbers": [], "players": {}, "winners": {}}
-
 
 # 📌 Funzione per salvare lo stato del gioco
 async def save_game_state(state):
