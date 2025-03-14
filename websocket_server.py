@@ -101,9 +101,20 @@ async def load_game_state():
                 "winners": {},
                 "userInfo": user_info  # ✅ Aggiunto userInfo alla risposta WebSocket
             }
-        except Exception as e:
-            logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
-            return {"drawn_numbers": [], "players": {}, "winners": {}, "userInfo": {}}
+
+            from datetime import datetime, timedelta
+
+            # 🔹 Calcola il tempo della prossima partita se non è presente
+            if not game.next_game_time:
+                next_game_time = datetime.utcnow() + timedelta(minutes=5)  # Imposta la prossima partita tra 5 minuti
+            else:
+                next_game_time = game.next_game_time
+            
+            next_game_timestamp = int(next_game_time.timestamp() * 1000)  # Convertito in timestamp JS
+            
+                    except Exception as e:
+                        logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
+                        return {"drawn_numbers": [], "players": {}, "winners": {}, "userInfo": {}}
 
 
 # 📌 Funzione per salvare lo stato del gioco
