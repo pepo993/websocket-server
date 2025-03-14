@@ -32,7 +32,6 @@ connected_clients = set()
 ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 
 # 📌 Funzione per caricare lo stato del gioco dal database
-# 📌 Funzione per caricare lo stato del gioco dal database
 async def load_game_state():
     async with SessionLocal() as db:
         try:
@@ -61,7 +60,13 @@ async def load_game_state():
                 return {"drawn_numbers": drawn_numbers, "players": {}, "winners": {}, "userInfo": {}}
 
             players = {}
-            user_info = {}  # ✅ Nuovo dizionario per username e first_name
+            # ✅ Recuperiamo tutti gli utenti in UNA SOLA query
+            user_ids = [ticket.user_id for ticket in tickets]
+            user_info = {}
+            if user_ids:
+                user_results = await db.execute(select(User.telegram_id, User.username, User.first_name).where(User.telegram_id.in_(user_ids)))
+                users = {user.telegram_id: {"username": user.username, "first_name": user.first_name} for user in user_results}
+                user_info = users  # ✅ Assegniamo direttamente i dati recuperati
 
             for ticket in tickets:
                 if ticket.user_id not in players:
