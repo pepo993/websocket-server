@@ -183,6 +183,8 @@ async def notify_clients():
         if connected_clients:
             try:
                 game_data = await load_game_state()
+                # ✅ Recuperiamo game_id in modo sicuro
+                game_id = game_data.get("game_id", None)
                 await asyncio.sleep(1.5)
 
                 if not game_data or "drawn_numbers" not in game_data:
