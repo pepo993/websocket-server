@@ -10,6 +10,7 @@ from sqlalchemy.future import select
 from database import SessionLocal
 from models import Game, Ticket, User
 from config import COSTO_CARTELLA
+import traceback  # 🔥 Per log più dettagliati
 import config 
 
 # 📌 Assicura che INFO vada su stdout
@@ -90,8 +91,7 @@ async def load_game_state():
                 except json.JSONDecodeError:
                     logging.error(f"❌ Errore nel parsing JSON per il ticket di {ticket.user_id}")
 
-                    }
-
+        
             logging.info(f"👥 Giocatori trovati: {len(players)}")
 
             return {
