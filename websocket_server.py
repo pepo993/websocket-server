@@ -10,7 +10,6 @@ from sqlalchemy.future import select
 from database import SessionLocal
 from models import Game, Ticket, User
 from config import COSTO_CARTELLA
-import Exception  # 🔥 Per log più dettagliati
 import config 
 
 # 📌 Assicura che INFO vada su stdout
