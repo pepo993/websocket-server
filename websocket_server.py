@@ -102,16 +102,6 @@ async def load_game_state():
                 "userInfo": user_info  # ✅ Aggiunto userInfo alla risposta WebSocket
             }
 
-            from datetime import datetime, timedelta
-
-            # 🔹 Calcola il tempo della prossima partita se non è presente
-            if not game.next_game_time:
-                next_game_time = datetime.utcnow() + timedelta(minutes=5)  # Imposta la prossima partita tra 5 minuti
-            else:
-                next_game_time = game.next_game_time
-            
-            next_game_timestamp = int(next_game_time.timestamp() * 1000)  # Convertito in timestamp JS
-            
         except Exception as e:
             logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
             return {"drawn_numbers": [], "players": {}, "winners": {}, "userInfo": {}}
@@ -212,7 +202,7 @@ async def notify_clients():
                     "numeri_estratti": game_data["drawn_numbers"],
                     "game_status": {
                         "game_id": game_id,  
-                        "next_game_time": next_game_timestamp,
+                        "next_game_time": next_game_times,
                         "cartelle_vendute": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()),
                         "jackpot": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
                         "giocatori_attivi": len(game_data.get("players", {})),
