@@ -92,7 +92,6 @@ async def load_game_state():
                 "userInfo": user_info  # ✅ Aggiunto userInfo alla risposta WebSocket
             }
         except Exception as e
-            logging.error(traceback.format_exc())  # 🔥 Stack trace completo
             logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
             return {"drawn_numbers": [], "players": {}, "winners": {}, "userInfo": {}}
 
