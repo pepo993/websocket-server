@@ -76,10 +76,20 @@ async def load_game_state():
                 except json.JSONDecodeError:
                     logging.error(f"❌ Errore nel parsing JSON per il ticket di {ticket.user_id}")
 
-                if user:
-                    user_info[ticket.user_id] = {
-                        "username": user.username if user.username else None,
-                        "first_name": user.first_name if user.first_name else None
+                # ✅ Recuperiamo le informazioni dell'utente direttamente dal dizionario `user_info`
+                user_data = user_info.get(ticket.user_id, {"username": None, "first_name": None})
+                
+                players[ticket.user_id] = {
+                    "cartelle": [],
+                    "username": user_data["username"],  # ✅ Ora assegniamo username senza errore
+                    "first_name": user_data["first_name"]
+                }
+                
+                try:
+                    players[ticket.user_id]["cartelle"].append(json.loads(ticket.numbers))
+                except json.JSONDecodeError:
+                    logging.error(f"❌ Errore nel parsing JSON per il ticket di {ticket.user_id}")
+
                     }
 
             logging.info(f"👥 Giocatori trovati: {len(players)}")
