@@ -183,7 +183,11 @@ async def notify_clients():
         if connected_clients:
             try:
                 game_data = await load_game_state()
+
+                # ✅ Recuperiamo game_id e nextGameTime in modo sicuro da game_data
                 game_id = game_data.get("game_id", None)
+                next_game_time = game_data.get("next_game_time", None)
+
                 await asyncio.sleep(1.5)
 
                 if not game_data or "drawn_numbers" not in game_data:
@@ -196,7 +200,8 @@ async def notify_clients():
                     "numero_estratto": game_data["drawn_numbers"][-1] if game_data["drawn_numbers"] else None,
                     "numeri_estratti": game_data["drawn_numbers"],
                     "game_status": {
-                        "game_id": game_data.get("game_id", None),  # ✅ ORA il valore viene preso da game_data
+                        "game_id": game_id,  
+                        "next_game_time": next_game_time,  # ✅ Ora il tempo della prossima partita viene inviato
                         "cartelle_vendute": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()),
                         "jackpot": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
                         "giocatori_attivi": len(game_data.get("players", {})),
@@ -226,6 +231,7 @@ async def notify_clients():
                 logging.error(f"❌ Errore in notify_clients: {e}")
 
         await asyncio.sleep(2)
+
 
 # 📌 Health Check per Railway
 async def health_check(request):
