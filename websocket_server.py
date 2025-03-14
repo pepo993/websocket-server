@@ -10,7 +10,7 @@ from sqlalchemy.future import select
 from database import SessionLocal
 from models import Game, Ticket, User
 from config import COSTO_CARTELLA
-import traceback  # 🔥 Per log più dettagliati
+import Exception  # 🔥 Per log più dettagliati
 import config 
 
 # 📌 Assicura che INFO vada su stdout
@@ -91,7 +91,8 @@ async def load_game_state():
                 "winners": {},
                 "userInfo": user_info  # ✅ Aggiunto userInfo alla risposta WebSocket
             }
-        except Exception as e:
+        except Exception as e
+            logging.error(traceback.format_exc())  # 🔥 Stack trace completo
             logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
             return {"drawn_numbers": [], "players": {}, "winners": {}, "userInfo": {}}
 
@@ -113,7 +114,7 @@ async def save_game_state(state):
                 logging.warning("⚠️ Nessuna partita attiva trovata per il salvataggio.")
         except Exception as e:
             logging.error(f"❌ Errore nel salvataggio dello stato del gioco: {e}")
-            logging.error(traceback.format_exc())  # 🔥 Stack trace completo
+            logging.error(Exception.format_exc())  # 🔥 Stack trace completo
             await db.rollback()
 
 # 📌 Gestione delle connessioni WebSocket
