@@ -32,6 +32,7 @@ connected_clients = set()
 ultimo_stato_trasmesso = None  # Memorizza l'ultimo stato inviato
 
 # 📌 Funzione per caricare lo stato del gioco dal database
+# 📌 Funzione per caricare lo stato del gioco dal database
 async def load_game_state():
     async with SessionLocal() as db:
         try:
@@ -42,7 +43,7 @@ async def load_game_state():
 
             if not game:
                 logging.warning("⚠️ Nessuna partita attiva trovata.")
-                return {"drawn_numbers": [], "players": {}, "winners": {}}
+                return {"drawn_numbers": [], "players": {}, "winners": {}, "userInfo": {}}
 
             logging.info(f"🎮 Partita attiva trovata: {game.game_id}")
 
@@ -57,28 +58,42 @@ async def load_game_state():
                 logging.info(f"🎟️ Biglietti trovati: {len(tickets)}")
             except Exception as e:
                 logging.error(f"❌ Errore nel recupero dei ticket: {e}")
-                return {"drawn_numbers": drawn_numbers, "players": {}, "winners": {}}
+                return {"drawn_numbers": drawn_numbers, "players": {}, "winners": {}, "userInfo": {}}
 
             players = {}
+            user_info = {}  # ✅ Nuovo dizionario per username e first_name
+
             for ticket in tickets:
                 if ticket.user_id not in players:
                     players[ticket.user_id] = {"cartelle": []}
+                
                 try:
-                    players[ticket.user_id]["cartelle"].append(json.loads(ticket.numbers))  # ✅ Fix JSON
+                    players[ticket.user_id]["cartelle"].append(json.loads(ticket.numbers))
                 except json.JSONDecodeError:
                     logging.error(f"❌ Errore nel parsing JSON per il ticket di {ticket.user_id}")
+
+                # ✅ Recuperiamo le informazioni dell'utente
+                user_result = await db.execute(select(User).filter(User.telegram_id == ticket.user_id))
+                user = user_result.scalars().first()
+
+                if user:
+                    user_info[ticket.user_id] = {
+                        "username": user.username if user.username else None,
+                        "first_name": user.first_name if user.first_name else None
+                    }
 
             logging.info(f"👥 Giocatori trovati: {len(players)}")
 
             return {
                 "drawn_numbers": drawn_numbers,
                 "players": players,
-                "winners": {}
+                "winners": {},
+                "userInfo": user_info  # ✅ Aggiunto userInfo alla risposta WebSocket
             }
         except Exception as e:
             logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
-            logging.error(traceback.format_exc())
-            return {"drawn_numbers": [], "players": {}, "winners": {}}
+            return {"drawn_numbers": [], "players": {}, "winners": {}, "userInfo": {}}
+
 
 # 📌 Funzione per salvare lo stato del gioco
 async def save_game_state(state):
