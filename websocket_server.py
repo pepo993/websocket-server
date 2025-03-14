@@ -112,9 +112,9 @@ async def load_game_state():
             
             next_game_timestamp = int(next_game_time.timestamp() * 1000)  # Convertito in timestamp JS
             
-                    except Exception as e:
-                        logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
-                        return {"drawn_numbers": [], "players": {}, "winners": {}, "userInfo": {}}
+        except Exception as e:
+            logging.error(f"❌ Errore nel caricamento dello stato del gioco: {e}")
+            return {"drawn_numbers": [], "players": {}, "winners": {}, "userInfo": {}}
 
 
 # 📌 Funzione per salvare lo stato del gioco
