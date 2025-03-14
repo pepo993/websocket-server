@@ -202,7 +202,7 @@ async def notify_clients():
                     "numeri_estratti": game_data["drawn_numbers"],
                     "game_status": {
                         "game_id": game_id,  
-                        "next_game_time": next_game_times,
+                        "next_game_time": next_game_time,
                         "cartelle_vendute": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()),
                         "jackpot": sum(len(p["cartelle"]) for p in game_data.get("players", {}).values()) * COSTO_CARTELLA,
                         "giocatori_attivi": len(game_data.get("players", {})),
