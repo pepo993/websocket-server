@@ -96,7 +96,6 @@ async def load_game_state():
 
             return {
                 "game_id": game.game_id,
-                "next_game_time": game.next_game_time,
                 "drawn_numbers": drawn_numbers,
                 "players": players,
                 "winners": {},
