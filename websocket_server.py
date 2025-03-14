@@ -61,6 +61,8 @@ async def load_game_state():
                 return {"drawn_numbers": drawn_numbers, "players": {}, "winners": {}, "userInfo": {}}
 
             players = {}
+            user_info = {}  # ✅ Inizializziamo user_info 
+
             # 📌 Ottimizzazione: Recupera tutti gli utenti in UNA SOLA query
             user_ids = [ticket.user_id for ticket in tickets]
             user_results = await db.execute(select(User.telegram_id, User.username, User.first_name).where(User.telegram_id.in_(user_ids)))
@@ -198,7 +200,7 @@ async def notify_clients():
 
                 # 📤 Invia solo se lo stato è cambiato
                 if stato_attuale != ultimo_stato_trasmesso:
-                    ultimo_stato_trasmesso = stato_attuale
+                    ultimo_stato_trasmesso = stato_attuale # ✅ Memorizziamo l'ultimo stato inviato
                     message = json.dumps(stato_attuale)
 
                     disconnected_clients = set()
