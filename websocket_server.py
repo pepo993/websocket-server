@@ -77,10 +77,6 @@ async def load_game_state():
                 except json.JSONDecodeError:
                     logging.error(f"❌ Errore nel parsing JSON per il ticket di {ticket.user_id}")
 
-                # ✅ Recuperiamo le informazioni dell'utente
-                user_result = await db.execute(select(User).filter(User.telegram_id == ticket.user_id))
-                user = user_result.scalars().first()
-
                 if user:
                     user_info[ticket.user_id] = {
                         "username": user.username if user.username else None,
