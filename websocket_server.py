@@ -8,7 +8,7 @@ import time
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from database import SessionLocal
-from models import Game, Ticket
+from models import Game, Ticket, User
 from config import COSTO_CARTELLA
 import traceback  # 🔥 Per log più dettagliati
 import config 
