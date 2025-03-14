@@ -128,36 +128,20 @@ async def save_game_state(state):
             await db.rollback()
 
 # 📌 Gestione delle connessioni WebSocket
+import json
+import logging
+import websockets
+
 connected_clients = set()
 
 async def handler(websocket):
-    """Gestisce la connessione WebSocket dei client autenticando gli utenti prima di trasmettere aggiornamenti."""
-    
+    """Gestisce la connessione WebSocket dei client e trasmette gli aggiornamenti."""
+    connected_clients.add(websocket)
+    logging.info(f"✅ Nuovo client connesso! Totale: {len(connected_clients)} - {websocket.remote_address}")
+
     try:
-        # 📌 Attende il primo messaggio contenente il Telegram ID
-        auth_message = await websocket.recv()
-        auth_data = json.loads(auth_message)
-        telegram_id = auth_data.get("telegram_id")
-
-        async with SessionLocal() as db:
-            # 🔍 Verifica se l'utente esiste nel database
-            result = await db.execute(select(User).filter(User.telegram_id == telegram_id))
-            user = result.scalars().first()
-
-        if not user:
-            await websocket.send(json.dumps({"error": "❌ Accesso negato: utente non registrato."}))
-            await websocket.close()
-            logging.warning(f"⛔ Connessione rifiutata: {telegram_id} non registrato nel database.")
-            return
-
-        logging.info(f"✅ Utente {telegram_id} autenticato con successo!")
-
-        # ✅ Aggiunge solo utenti autenticati alla lista
-        connected_clients.add(websocket)
-        logging.info(f"🔗 Nuovo client connesso! Totale attivi: {len(connected_clients)} - {websocket.remote_address}")
-
-        async for message in websocket:
-            logging.info(f"📥 Messaggio ricevuto da {telegram_id}: {message}")
+        async for message in websocket:  # 🔹 Nessun timeout, connessione aperta finché il client è connesso
+            logging.info(f"📥 Messaggio ricevuto: {message}")
 
             try:
                 game_state = json.loads(message)
